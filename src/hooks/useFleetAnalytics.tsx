@@ -17,6 +17,11 @@ export interface FleetAnalytics {
   upcomingMOTs: { vehicle: Vehicle; daysUntil: number }[];
   overdueMOTs: Vehicle[];
   motStats: { valid: number; dueSoon: number; overdue: number; unknown: number };
+  // Raw data for charts that need filtering
+  serviceRecords: ServiceRecord[];
+  documents: Document[];
+  fuelRecords: FuelRecord[];
+  vehicleData: { vehicleId: string; registration: string; make: string; model: string; annualTax: number; monthlyFinance: number }[];
 }
 
 export function useFleetAnalytics() {
@@ -194,6 +199,16 @@ export function useFleetAnalytics() {
       // Sort upcoming MOTs by days until
       upcomingMOTs.sort((a, b) => a.daysUntil - b.daysUntil);
 
+      // Vehicle data for charts
+      const vehicleData = typedVehicles.map(v => ({
+        vehicleId: v.id,
+        registration: v.registration,
+        make: v.make,
+        model: v.model,
+        annualTax: v.annual_tax || 0,
+        monthlyFinance: v.monthly_finance || 0,
+      }));
+
       return {
         totalVehicles: typedVehicles.length,
         totalCost,
@@ -208,6 +223,11 @@ export function useFleetAnalytics() {
         upcomingMOTs,
         overdueMOTs,
         motStats,
+        // Raw data for charts
+        serviceRecords: typedRecords,
+        documents: typedDocs,
+        fuelRecords: typedFuel,
+        vehicleData,
       } as FleetAnalytics;
     },
   });
