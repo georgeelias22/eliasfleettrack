@@ -29,6 +29,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { pdfToJpegDataUrls } from '@/lib/pdfToImages';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -237,17 +238,27 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
     });
   };
 
-  const readFileAsText = async (fileToRead: File): Promise<string> => {
-    if (fileToRead.type.startsWith('image/')) {
-      return compressImage(fileToRead);
+  const readFileForScan = async (fileToRead: File): Promise<{ fileContent?: string; fileImages?: string[] }> => {
+    // Prefer images for PDFs (lower hallucination risk than huge extracted text)
+    if (fileToRead.type === 'application/pdf' || fileToRead.name.toLowerCase().endsWith('.pdf')) {
+      const fileImages = await pdfToJpegDataUrls(fileToRead, { maxPages: 2, scale: 2, jpegQuality: 0.7, maxWidth: 1400 });
+      return { fileImages };
     }
-    
-    return new Promise((resolve, reject) => {
+
+    if (fileToRead.type.startsWith('image/')) {
+      const fileContent = await compressImage(fileToRead);
+      return { fileContent };
+    }
+
+    const fileContent = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsText(fileToRead);
     });
+
+    // Hard cap (prevents huge token payloads)
+    return { fileContent: fileContent.length > 40000 ? fileContent.slice(0, 40000) : fileContent };
   };
 
   const matchVehicleByRegistration = (reg: string): string => {
@@ -293,26 +304,26 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
         const batch = files.slice(i, i + BATCH_SIZE);
 
         // Process batch in parallel
-        const results = await Promise.allSettled(
-          batch.map(async (f) => {
-            const fileContent = await readFileAsText(f);
-            const { data, error } = await supabase.functions.invoke('scan-fuel-invoice', {
-              body: {
-                fileContent,
-                fileName: f.name,
-                vehicleRegistrations,
-              },
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-              },
-            });
-            
-            if (error) throw error;
-            if (data?.error) throw new Error(data.error);
-            
-            return data?.data as ExtractedFuelData;
-          })
-        );
+          const results = await Promise.allSettled(
+            batch.map(async (f) => {
+              const scanInput = await readFileForScan(f);
+              const { data, error } = await supabase.functions.invoke('scan-fuel-invoice', {
+                body: {
+                  ...scanInput,
+                  fileName: f.name,
+                  vehicleRegistrations,
+                },
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
+              });
+              
+              if (error) throw error;
+              if (data?.error) throw new Error(data.error);
+              
+              return data as ExtractedFuelData;
+            })
+          );
         
         // Process results from this batch
         results.forEach((result) => {
