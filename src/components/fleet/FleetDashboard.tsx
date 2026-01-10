@@ -167,7 +167,12 @@ export function FleetDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CostByVehicleChart data={analytics.costByVehicle} />
+            <CostByVehicleChart 
+              vehicles={analytics.vehicleData}
+              serviceRecords={analytics.serviceRecords}
+              documents={analytics.documents}
+              fuelRecords={analytics.fuelRecords}
+            />
           </CardContent>
         </Card>
       </div>
