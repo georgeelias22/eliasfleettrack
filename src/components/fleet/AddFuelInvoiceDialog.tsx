@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useCreateFuelRecord } from '@/hooks/useFuelRecords';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -19,34 +21,200 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Receipt, Plus, Trash2, Loader2, Fuel } from 'lucide-react';
+import { Receipt, Plus, Trash2, Loader2, Fuel, Upload, Sparkles, FileText, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 
 interface FuelLineItem {
   id: string;
   vehicleId: string;
+  registration: string;
   litres: string;
   costPerLitre: string;
   mileage: string;
 }
 
+interface ExtractedFuelData {
+  invoiceDate?: string;
+  station?: string;
+  invoiceTotal?: number;
+  lineItems?: {
+    registration?: string;
+    litres?: number;
+    costPerLitre?: number;
+    totalCost?: number;
+    mileage?: number;
+  }[];
+}
+
 export function AddFuelInvoiceDialog() {
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upload' | 'manual'>('upload');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [station, setStation] = useState('');
   const [lineItems, setLineItems] = useState<FuelLineItem[]>([
-    { id: crypto.randomUUID(), vehicleId: '', litres: '', costPerLitre: '', mileage: '' }
+    { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '' }
   ]);
   const [submitting, setSubmitting] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
   
   const { data: vehicles = [] } = useVehicles();
   const createFuelRecord = useCreateFuelRecord();
   const { toast } = useToast();
 
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      setFile(acceptedFiles[0]);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/*': ['.png', '.jpg', '.jpeg'],
+      'text/*': ['.txt', '.csv'],
+    },
+    maxSize: 10 * 1024 * 1024,
+    multiple: false,
+  });
+
+  const compressImage = (imageFile: File, maxWidth: number = 1200): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(imageFile);
+    });
+  };
+
+  const readFileAsText = async (fileToRead: File): Promise<string> => {
+    if (fileToRead.type.startsWith('image/')) {
+      return compressImage(fileToRead);
+    }
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsText(fileToRead);
+    });
+  };
+
+  const matchVehicleByRegistration = (reg: string): string => {
+    if (!reg) return '';
+    const normalizedReg = reg.replace(/\s+/g, '').toUpperCase();
+    const vehicle = vehicles.find(v => 
+      v.registration.replace(/\s+/g, '').toUpperCase() === normalizedReg
+    );
+    return vehicle?.id || '';
+  };
+
+  const handleScanInvoice = async () => {
+    if (!file) return;
+    
+    setScanning(true);
+    
+    try {
+      const fileContent = await readFileAsText(file);
+      const vehicleRegistrations = vehicles.map(v => v.registration);
+      
+      const { data, error } = await supabase.functions.invoke('scan-fuel-invoice', {
+        body: { 
+          fileContent, 
+          fileName: file.name,
+          vehicleRegistrations,
+        },
+      });
+      
+      if (error) throw error;
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      const extractedData = data?.data as ExtractedFuelData;
+      
+      if (extractedData) {
+        // Apply extracted data
+        if (extractedData.invoiceDate) {
+          setInvoiceDate(extractedData.invoiceDate);
+        }
+        if (extractedData.station) {
+          setStation(extractedData.station);
+        }
+        
+        if (extractedData.lineItems && extractedData.lineItems.length > 0) {
+          const newLineItems: FuelLineItem[] = extractedData.lineItems.map(item => ({
+            id: crypto.randomUUID(),
+            vehicleId: matchVehicleByRegistration(item.registration || ''),
+            registration: item.registration || '',
+            litres: item.litres?.toString() || '',
+            costPerLitre: item.costPerLitre?.toString() || '',
+            mileage: item.mileage?.toString() || '',
+          }));
+          setLineItems(newLineItems);
+          
+          toast({
+            title: 'Invoice scanned',
+            description: `Found ${newLineItems.length} fuel line item${newLineItems.length > 1 ? 's' : ''}.`,
+          });
+        } else {
+          toast({
+            title: 'No line items found',
+            description: 'Could not extract fuel line items. Please enter manually.',
+            variant: 'destructive',
+          });
+        }
+        
+        // Switch to manual tab to review/edit
+        setActiveTab('manual');
+      }
+    } catch (error) {
+      console.error('Scan error:', error);
+      toast({
+        title: 'Scan failed',
+        description: error instanceof Error ? error.message : 'Could not extract data. Please enter manually.',
+        variant: 'destructive',
+      });
+    } finally {
+      setScanning(false);
+    }
+  };
+
   const addLineItem = () => {
     setLineItems(prev => [
       ...prev,
-      { id: crypto.randomUUID(), vehicleId: '', litres: '', costPerLitre: '', mileage: '' }
+      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '' }
     ]);
   };
 
@@ -57,9 +225,19 @@ export function AddFuelInvoiceDialog() {
   };
 
   const updateLineItem = (id: string, field: keyof FuelLineItem, value: string) => {
-    setLineItems(prev => prev.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
-    ));
+    setLineItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      
+      const updated = { ...item, [field]: value };
+      
+      // If vehicleId is updated, also update registration
+      if (field === 'vehicleId') {
+        const vehicle = vehicles.find(v => v.id === value);
+        updated.registration = vehicle?.registration || '';
+      }
+      
+      return updated;
+    }));
   };
 
   const calculateLineTotal = (item: FuelLineItem) => {
@@ -94,7 +272,6 @@ export function AddFuelInvoiceDialog() {
     setSubmitting(true);
     
     try {
-      // Create all fuel records in parallel
       await Promise.all(validItems.map(item => 
         createFuelRecord.mutateAsync({
           vehicle_id: item.vehicleId,
@@ -129,185 +306,274 @@ export function AddFuelInvoiceDialog() {
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setStation('');
     setLineItems([
-      { id: crypto.randomUUID(), vehicleId: '', litres: '', costPerLitre: '', mileage: '' }
+      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '' }
     ]);
-  };
-
-  const getVehicleLabel = (vehicleId: string) => {
-    const vehicle = vehicles.find(v => v.id === vehicleId);
-    return vehicle ? `${vehicle.registration} - ${vehicle.make} ${vehicle.model}` : '';
+    setFile(null);
+    setActiveTab('upload');
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) resetForm();
+    }}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Receipt className="w-4 h-4" />
           Add Fuel Invoice
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh]">
+      <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-primary" />
             Add Fuel Invoice
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="invoiceDate">Invoice Date</Label>
-              <Input
-                id="invoiceDate"
-                type="date"
-                value={invoiceDate}
-                onChange={(e) => setInvoiceDate(e.target.value)}
-                className="bg-secondary/50"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="station">Station / Supplier</Label>
-              <Input
-                id="station"
-                placeholder="e.g. Shell, BP, Texaco..."
-                value={station}
-                onChange={(e) => setStation(e.target.value)}
-                className="bg-secondary/50"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Line Items</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addLineItem}
-                className="gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                Add Vehicle
-              </Button>
+        
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'upload' | 'manual')} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="upload" className="gap-2">
+              <Sparkles className="w-4 h-4" />
+              Upload & Scan
+            </TabsTrigger>
+            <TabsTrigger value="manual" className="gap-2">
+              <FileText className="w-4 h-4" />
+              Manual Entry
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="upload" className="space-y-4 mt-4">
+            <div
+              {...getRootProps()}
+              className={cn(
+                'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200',
+                isDragActive 
+                  ? 'border-primary bg-primary/5' 
+                  : 'border-border hover:border-primary/50 hover:bg-secondary/30'
+              )}
+            >
+              <input {...getInputProps()} />
+              <Upload className={cn(
+                'w-12 h-12 mx-auto mb-4 transition-colors',
+                isDragActive ? 'text-primary' : 'text-muted-foreground'
+              )} />
+              <p className="text-foreground font-medium mb-1">
+                {isDragActive ? 'Drop invoice here' : 'Drag & drop fuel invoice'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                PDF, images, or text files up to 10MB
+              </p>
+              <div className="flex items-center justify-center gap-2 mt-3 text-xs text-primary">
+                <Sparkles className="w-4 h-4" />
+                <span>AI will automatically extract fuel data</span>
+              </div>
             </div>
             
-            <ScrollArea className="max-h-[300px]">
-              <div className="space-y-3 pr-4">
-                {lineItems.map((item, index) => (
-                  <div 
-                    key={item.id} 
-                    className="p-4 rounded-lg border border-border bg-secondary/30 space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Line {index + 1}
-                      </span>
-                      {lineItems.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => removeLineItem(item.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Vehicle</Label>
-                      <Select
-                        value={item.vehicleId}
-                        onValueChange={(value) => updateLineItem(item.id, 'vehicleId', value)}
-                      >
-                        <SelectTrigger className="bg-secondary/50">
-                          <SelectValue placeholder="Select vehicle" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vehicles.map((vehicle) => (
-                            <SelectItem key={vehicle.id} value={vehicle.id}>
-                              {vehicle.registration} - {vehicle.make} {vehicle.model}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-2">
-                        <Label>Litres</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="45.5"
-                          value={item.litres}
-                          onChange={(e) => updateLineItem(item.id, 'litres', e.target.value)}
-                          className="bg-secondary/50"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>£/Litre</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          placeholder="1.459"
-                          value={item.costPerLitre}
-                          onChange={(e) => updateLineItem(item.id, 'costPerLitre', e.target.value)}
-                          className="bg-secondary/50"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Mileage</Label>
-                        <Input
-                          type="number"
-                          placeholder="45000"
-                          value={item.mileage}
-                          onChange={(e) => updateLineItem(item.id, 'mileage', e.target.value)}
-                          className="bg-secondary/50"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                      <span className="text-sm text-muted-foreground">Line Total</span>
-                      <span className="font-semibold text-primary">
-                        £{calculateLineTotal(item)}
-                      </span>
-                    </div>
+            {file && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </p>
                   </div>
-                ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setFile(null)}
+                  disabled={scanning}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
               </div>
-            </ScrollArea>
-          </div>
-
-          <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-sm text-muted-foreground">Invoice Total</span>
-                <p className="text-xs text-muted-foreground">
-                  {lineItems.filter(i => i.vehicleId && i.litres && i.costPerLitre).length} vehicle(s)
-                </p>
-              </div>
-              <span className="text-2xl font-bold text-primary">£{calculateInvoiceTotal()}</span>
-            </div>
-          </div>
-
-          <Button 
-            type="submit" 
-            className="w-full gradient-primary"
-            disabled={submitting}
-          >
-            {submitting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Fuel className="w-4 h-4 mr-2" />
             )}
-            Add Fuel Invoice
-          </Button>
-        </form>
+            
+            <Button 
+              onClick={handleScanInvoice}
+              className="w-full gradient-primary"
+              disabled={!file || scanning}
+            >
+              {scanning ? (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
+                  Scanning Invoice...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Scan & Extract Data
+                </>
+              )}
+            </Button>
+          </TabsContent>
+          
+          <TabsContent value="manual" className="mt-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invoiceDate">Invoice Date</Label>
+                  <Input
+                    id="invoiceDate"
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    className="bg-secondary/50"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="station">Station / Supplier</Label>
+                  <Input
+                    id="station"
+                    placeholder="e.g. Shell, BP, Texaco..."
+                    value={station}
+                    onChange={(e) => setStation(e.target.value)}
+                    className="bg-secondary/50"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Line Items</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addLineItem}
+                    className="gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add Vehicle
+                  </Button>
+                </div>
+                
+                <ScrollArea className="max-h-[250px]">
+                  <div className="space-y-3 pr-4">
+                    {lineItems.map((item, index) => (
+                      <div 
+                        key={item.id} 
+                        className="p-4 rounded-lg border border-border bg-secondary/30 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">
+                            Line {index + 1}
+                            {item.registration && !item.vehicleId && (
+                              <span className="ml-2 text-amber-500">
+                                (Reg: {item.registration} - select vehicle)
+                              </span>
+                            )}
+                          </span>
+                          {lineItems.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => removeLineItem(item.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Vehicle</Label>
+                          <Select
+                            value={item.vehicleId}
+                            onValueChange={(value) => updateLineItem(item.id, 'vehicleId', value)}
+                          >
+                            <SelectTrigger className="bg-secondary/50">
+                              <SelectValue placeholder="Select vehicle" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {vehicles.map((vehicle) => (
+                                <SelectItem key={vehicle.id} value={vehicle.id}>
+                                  {vehicle.registration} - {vehicle.make} {vehicle.model}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-2">
+                            <Label>Litres</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="45.5"
+                              value={item.litres}
+                              onChange={(e) => updateLineItem(item.id, 'litres', e.target.value)}
+                              className="bg-secondary/50"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>£/Litre</Label>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              placeholder="1.459"
+                              value={item.costPerLitre}
+                              onChange={(e) => updateLineItem(item.id, 'costPerLitre', e.target.value)}
+                              className="bg-secondary/50"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Mileage</Label>
+                            <Input
+                              type="number"
+                              placeholder="45000"
+                              value={item.mileage}
+                              onChange={(e) => updateLineItem(item.id, 'mileage', e.target.value)}
+                              className="bg-secondary/50"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                          <span className="text-sm text-muted-foreground">Line Total</span>
+                          <span className="font-semibold text-primary">
+                            £{calculateLineTotal(item)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm text-muted-foreground">Invoice Total</span>
+                    <p className="text-xs text-muted-foreground">
+                      {lineItems.filter(i => i.vehicleId && i.litres && i.costPerLitre).length} vehicle(s)
+                    </p>
+                  </div>
+                  <span className="text-2xl font-bold text-primary">£{calculateInvoiceTotal()}</span>
+                </div>
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full gradient-primary"
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Fuel className="w-4 h-4 mr-2" />
+                )}
+                Add Fuel Invoice
+              </Button>
+            </form>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
