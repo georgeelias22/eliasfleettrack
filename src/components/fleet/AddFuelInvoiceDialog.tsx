@@ -52,7 +52,11 @@ interface ExtractedFuelData {
   }[];
 }
 
-export function AddFuelInvoiceDialog() {
+interface AddFuelInvoiceDialogProps {
+  trigger?: React.ReactNode;
+}
+
+export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'upload' | 'manual'>('upload');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -402,10 +406,12 @@ export function AddFuelInvoiceDialog() {
       if (!isOpen) resetForm();
     }}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Receipt className="w-4 h-4" />
-          Add Fuel Invoice
-        </Button>
+        {trigger || (
+          <Button variant="outline" className="gap-2">
+            <Receipt className="w-4 h-4" />
+            Add Fuel Invoice
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>

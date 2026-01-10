@@ -12,7 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CostTrendChartProps {
-  data: { month: string; cost: number; fuelCost: number; financeCost: number }[];
+  data: { month: string; monthKey: string; cost: number; fuelCost: number; financeCost: number; taxCost: number }[];
 }
 
 type TimePeriod = '3m' | '6m' | '12m';
@@ -30,6 +30,10 @@ export function CostTrendChart({ data }: CostTrendChartProps) {
   const filteredData = data.slice(-monthsToShow);
   
   const hasData = filteredData.some(d => d.cost > 0);
+
+  const monthLabelByKey: Record<string, string> = Object.fromEntries(
+    filteredData.map((d) => [d.monthKey, d.month])
+  );
 
   return (
     <div className="space-y-3">
@@ -69,6 +73,10 @@ export function CostTrendChart({ data }: CostTrendChartProps) {
                   <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.3} />
                   <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0} />
                 </linearGradient>
+                <linearGradient id="taxGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(280, 70%, 50%)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(280, 70%, 50%)" stopOpacity={0} />
+                </linearGradient>
               </defs>
               <CartesianGrid 
                 strokeDasharray="3 3" 
@@ -76,11 +84,12 @@ export function CostTrendChart({ data }: CostTrendChartProps) {
                 vertical={false}
               />
               <XAxis 
-                dataKey="month" 
+                dataKey="monthKey" 
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
                 tickLine={false}
                 axisLine={false}
+                tickFormatter={(value) => monthLabelByKey[String(value)] ?? String(value)}
               />
               <YAxis 
                 stroke="hsl(var(--muted-foreground))"
@@ -97,14 +106,25 @@ export function CostTrendChart({ data }: CostTrendChartProps) {
                   boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                 }}
                 labelStyle={{ color: 'hsl(var(--foreground))' }}
+                labelFormatter={(label) => monthLabelByKey[String(label)] ?? String(label)}
                 formatter={(value: number, name: string) => {
-                  const label = name === 'cost' ? 'Total' : name === 'fuelCost' ? 'Fuel' : 'Finance';
-                  return [`£${value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`, label];
+                  const labels: Record<string, string> = { 
+                    cost: 'Total', 
+                    fuelCost: 'Fuel', 
+                    financeCost: 'Finance',
+                    taxCost: 'Tax'
+                  };
+                  return [`£${value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`, labels[name] || name];
                 }}
               />
               <Legend 
                 formatter={(value) => {
-                  const labels: Record<string, string> = { cost: 'Total', fuelCost: 'Fuel', financeCost: 'Finance' };
+                  const labels: Record<string, string> = { 
+                    cost: 'Total', 
+                    fuelCost: 'Fuel', 
+                    financeCost: 'Finance',
+                    taxCost: 'Tax'
+                  };
                   return labels[value] || value;
                 }}
               />
@@ -128,6 +148,13 @@ export function CostTrendChart({ data }: CostTrendChartProps) {
                 stroke="hsl(160, 84%, 39%)"
                 strokeWidth={2}
                 fill="url(#financeGradient)"
+              />
+              <Area
+                type="monotone"
+                dataKey="taxCost"
+                stroke="hsl(280, 70%, 50%)"
+                strokeWidth={2}
+                fill="url(#taxGradient)"
               />
             </AreaChart>
           </ResponsiveContainer>

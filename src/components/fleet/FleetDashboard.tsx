@@ -9,7 +9,9 @@ import {
   Calendar,
   Fuel,
   Receipt,
-  BarChart3
+  BarChart3,
+  FileText,
+  Car
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
 import { UpcomingMOTList } from './UpcomingMOTList';
@@ -18,6 +20,8 @@ import { FuelTrendChart } from './FuelTrendChart';
 import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
 import { TwelveMonthSummary } from './TwelveMonthSummary';
+import { AddFuelInvoiceDialog } from './AddFuelInvoiceDialog';
+import { AddVehicleDialog } from './AddVehicleDialog';
 
 export function FleetDashboard() {
   const { data: analytics, isLoading, error } = useFleetAnalytics();
@@ -38,6 +42,41 @@ export function FleetDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Mobile Quick Actions - Prominent Upload Buttons */}
+      <div className="lg:hidden">
+        <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-card to-amber-500/5">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+              <h3 className="text-base font-semibold text-foreground">Quick Actions</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <AddFuelInvoiceDialog 
+                  trigger={
+                    <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-amber-500/10 border-2 border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all active:scale-95">
+                      <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center">
+                        <FileText className="w-7 h-7 text-amber-500" />
+                      </div>
+                      <span className="text-sm font-semibold text-foreground">Scan Invoice</span>
+                      <span className="text-xs text-muted-foreground text-center">Upload & auto-extract</span>
+                    </button>
+                  }
+                />
+                <AddVehicleDialog
+                  trigger={
+                    <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-primary/10 border-2 border-primary/30 hover:bg-primary/20 hover:border-primary/50 transition-all active:scale-95">
+                      <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Car className="w-7 h-7 text-primary" />
+                      </div>
+                      <span className="text-sm font-semibold text-foreground">Add Vehicle</span>
+                      <span className="text-xs text-muted-foreground text-center">Register new vehicle</span>
+                    </button>
+                  }
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* 12 Month Summary - All Key Stats */}
       <div>
         <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -58,9 +97,8 @@ export function FleetDashboard() {
         />
       </div>
 
-
-      {/* Fuel Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Fuel Charts Row - Hidden on Mobile */}
+      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Fuel Trend Chart */}
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
@@ -88,8 +126,8 @@ export function FleetDashboard() {
         </Card>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Charts Row - Hidden on Mobile */}
+      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Cost Trend Chart */}
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
@@ -160,22 +198,24 @@ export function FleetDashboard() {
 function FleetDashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {[...Array(7)].map((_, i) => (
-          <Card key={i} className="border-border/50">
-            <CardContent className="p-4">
-              <Skeleton className="h-4 w-20 mb-2" />
-              <Skeleton className="h-8 w-16" />
-            </CardContent>
-          </Card>
-        ))}
+      {/* Mobile Quick Actions Skeleton */}
+      <div className="lg:hidden">
+        <Card className="border-border/50">
+          <CardContent className="p-4">
+            <Skeleton className="h-32 w-full" />
+          </CardContent>
+        </Card>
       </div>
+      
+      {/* Summary Skeleton */}
       <Card className="border-border/50">
-        <CardContent className="p-6">
-          <Skeleton className="h-[250px] w-full" />
+        <CardContent className="p-4">
+          <Skeleton className="h-24 w-full" />
         </CardContent>
       </Card>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      {/* Charts Skeleton - Hidden on Mobile */}
+      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border-border/50">
           <CardContent className="p-6">
             <Skeleton className="h-[200px] w-full" />
@@ -184,6 +224,20 @@ function FleetDashboardSkeleton() {
         <Card className="border-border/50">
           <CardContent className="p-6">
             <Skeleton className="h-[200px] w-full" />
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Bottom Row Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border-border/50">
+          <CardContent className="p-6">
+            <Skeleton className="h-[150px] w-full" />
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-6">
+            <Skeleton className="h-[150px] w-full" />
           </CardContent>
         </Card>
       </div>
