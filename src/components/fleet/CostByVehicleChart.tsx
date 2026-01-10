@@ -140,20 +140,22 @@ export function CostByVehicleChart({ vehicles, serviceRecords, documents, fuelRe
               />
               <XAxis 
                 dataKey="name" 
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={10}
+                stroke="hsl(var(--chart-text))"
+                fontSize={12}
+                fontWeight={500}
                 tickLine={false}
                 axisLine={false}
-                angle={-45}
-                textAnchor="end"
-                height={60}
+                interval={0}
+                tick={{ fill: 'hsl(var(--foreground))' }}
               />
               <YAxis 
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={11}
+                stroke="hsl(var(--chart-text))"
+                fontSize={12}
+                fontWeight={500}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => `£${value}`}
+                tick={{ fill: 'hsl(var(--foreground))' }}
               />
               <Tooltip 
                 contentStyle={{
