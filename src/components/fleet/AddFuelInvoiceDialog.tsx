@@ -273,6 +273,30 @@ export function AddFuelInvoiceDialog() {
     }, 0).toFixed(2);
   };
 
+  const uploadInvoiceFile = async (file: File): Promise<string | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+      
+      const { error } = await supabase.storage
+        .from('fuel-invoices')
+        .upload(fileName, file);
+      
+      if (error) {
+        console.error('Upload error:', error);
+        return null;
+      }
+      
+      return fileName;
+    } catch (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -292,6 +316,13 @@ export function AddFuelInvoiceDialog() {
     setSubmitting(true);
     
     try {
+      // Upload all invoice files first
+      let uploadedFilePath: string | null = null;
+      if (files.length > 0) {
+        // Upload the first file as the main invoice
+        uploadedFilePath = await uploadInvoiceFile(files[0]);
+      }
+
       await Promise.all(validItems.map(item => 
         createFuelRecord.mutateAsync({
           vehicle_id: item.vehicleId,
@@ -302,6 +333,7 @@ export function AddFuelInvoiceDialog() {
           mileage: item.mileage ? parseInt(item.mileage) : null,
           station: item.station || station || null,
           notes: `Invoice ${item.invoiceDate || invoiceDate}`,
+          invoice_file_path: uploadedFilePath,
         })
       ));
 
