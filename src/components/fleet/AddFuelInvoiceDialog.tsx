@@ -33,6 +33,8 @@ interface FuelLineItem {
   litres: string;
   costPerLitre: string;
   mileage: string;
+  invoiceDate: string;
+  station: string;
 }
 
 interface ExtractedFuelData {
@@ -54,20 +56,18 @@ export function AddFuelInvoiceDialog() {
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [station, setStation] = useState('');
   const [lineItems, setLineItems] = useState<FuelLineItem[]>([
-    { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '' }
+    { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '' }
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   
   const { data: vehicles = [] } = useVehicles();
   const createFuelRecord = useCreateFuelRecord();
   const { toast } = useToast();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
-    }
+    setFiles(prev => [...prev, ...acceptedFiles]);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -78,8 +78,12 @@ export function AddFuelInvoiceDialog() {
       'text/*': ['.txt', '.csv'],
     },
     maxSize: 10 * 1024 * 1024,
-    multiple: false,
+    multiple: true,
   });
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   const compressImage = (imageFile: File, maxWidth: number = 1200): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -139,65 +143,81 @@ export function AddFuelInvoiceDialog() {
     return vehicle?.id || '';
   };
 
-  const handleScanInvoice = async () => {
-    if (!file) return;
+  const handleScanInvoices = async () => {
+    if (files.length === 0) return;
     
     setScanning(true);
     
     try {
-      const fileContent = await readFileAsText(file);
       const vehicleRegistrations = vehicles.map(v => v.registration);
+      const allLineItems: FuelLineItem[] = [];
+      let lastDate = '';
+      let lastStation = '';
       
-      const { data, error } = await supabase.functions.invoke('scan-fuel-invoice', {
-        body: { 
-          fileContent, 
-          fileName: file.name,
-          vehicleRegistrations,
-        },
+      // Process all files in parallel
+      const results = await Promise.allSettled(
+        files.map(async (f) => {
+          const fileContent = await readFileAsText(f);
+          const { data, error } = await supabase.functions.invoke('scan-fuel-invoice', {
+            body: { 
+              fileContent, 
+              fileName: f.name,
+              vehicleRegistrations,
+            },
+          });
+          
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          
+          return data?.data as ExtractedFuelData;
+        })
+      );
+      
+      let successCount = 0;
+      let totalItems = 0;
+      
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) {
+          const extractedData = result.value;
+          successCount++;
+          
+          if (extractedData.invoiceDate) lastDate = extractedData.invoiceDate;
+          if (extractedData.station) lastStation = extractedData.station;
+          
+          if (extractedData.lineItems && extractedData.lineItems.length > 0) {
+            extractedData.lineItems.forEach(item => {
+              allLineItems.push({
+                id: crypto.randomUUID(),
+                vehicleId: matchVehicleByRegistration(item.registration || ''),
+                registration: item.registration || '',
+                litres: item.litres?.toString() || '',
+                costPerLitre: item.costPerLitre?.toString() || '',
+                mileage: item.mileage?.toString() || '',
+                invoiceDate: extractedData.invoiceDate || '',
+                station: extractedData.station || '',
+              });
+              totalItems++;
+            });
+          }
+        }
       });
       
-      if (error) throw error;
-      
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-      
-      const extractedData = data?.data as ExtractedFuelData;
-      
-      if (extractedData) {
-        // Apply extracted data
-        if (extractedData.invoiceDate) {
-          setInvoiceDate(extractedData.invoiceDate);
-        }
-        if (extractedData.station) {
-          setStation(extractedData.station);
-        }
+      if (allLineItems.length > 0) {
+        setLineItems(allLineItems);
+        if (lastDate) setInvoiceDate(lastDate);
+        if (lastStation) setStation(lastStation);
         
-        if (extractedData.lineItems && extractedData.lineItems.length > 0) {
-          const newLineItems: FuelLineItem[] = extractedData.lineItems.map(item => ({
-            id: crypto.randomUUID(),
-            vehicleId: matchVehicleByRegistration(item.registration || ''),
-            registration: item.registration || '',
-            litres: item.litres?.toString() || '',
-            costPerLitre: item.costPerLitre?.toString() || '',
-            mileage: item.mileage?.toString() || '',
-          }));
-          setLineItems(newLineItems);
-          
-          toast({
-            title: 'Invoice scanned',
-            description: `Found ${newLineItems.length} fuel line item${newLineItems.length > 1 ? 's' : ''}.`,
-          });
-        } else {
-          toast({
-            title: 'No line items found',
-            description: 'Could not extract fuel line items. Please enter manually.',
-            variant: 'destructive',
-          });
-        }
-        
-        // Switch to manual tab to review/edit
+        toast({
+          title: 'Invoices scanned',
+          description: `Found ${totalItems} fuel line item${totalItems > 1 ? 's' : ''} from ${successCount} invoice${successCount > 1 ? 's' : ''}.`,
+        });
         setActiveTab('manual');
+      } else {
+        toast({
+          title: 'No line items found',
+          description: 'Could not extract fuel line items. Please enter manually.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Scan error:', error);
@@ -214,7 +234,7 @@ export function AddFuelInvoiceDialog() {
   const addLineItem = () => {
     setLineItems(prev => [
       ...prev,
-      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '' }
+      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '' }
     ]);
   };
 
@@ -275,13 +295,13 @@ export function AddFuelInvoiceDialog() {
       await Promise.all(validItems.map(item => 
         createFuelRecord.mutateAsync({
           vehicle_id: item.vehicleId,
-          fill_date: invoiceDate,
+          fill_date: item.invoiceDate || invoiceDate,
           litres: parseFloat(item.litres),
           cost_per_litre: parseFloat(item.costPerLitre),
           total_cost: parseFloat(calculateLineTotal(item)),
           mileage: item.mileage ? parseInt(item.mileage) : null,
-          station: station || null,
-          notes: `Invoice ${invoiceDate}`,
+          station: item.station || station || null,
+          notes: `Invoice ${item.invoiceDate || invoiceDate}`,
         })
       ));
 
@@ -306,9 +326,9 @@ export function AddFuelInvoiceDialog() {
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setStation('');
     setLineItems([
-      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '' }
+      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '' }
     ]);
-    setFile(null);
+    setFiles([]);
     setActiveTab('upload');
   };
 
@@ -359,10 +379,10 @@ export function AddFuelInvoiceDialog() {
                 isDragActive ? 'text-primary' : 'text-muted-foreground'
               )} />
               <p className="text-foreground font-medium mb-1">
-                {isDragActive ? 'Drop invoice here' : 'Drag & drop fuel invoice'}
+                {isDragActive ? 'Drop invoices here' : 'Drag & drop fuel invoices'}
               </p>
               <p className="text-sm text-muted-foreground">
-                PDF, images, or text files up to 10MB
+                PDF, images, or text files up to 10MB (multiple files supported)
               </p>
               <div className="flex items-center justify-center gap-2 mt-3 text-xs text-primary">
                 <Sparkles className="w-4 h-4" />
@@ -370,42 +390,46 @@ export function AddFuelInvoiceDialog() {
               </div>
             </div>
             
-            {file && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </p>
+            {files.length > 0 && (
+              <div className="space-y-2">
+                {files.map((f, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">{f.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(f.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeFile(index)}
+                      disabled={scanning}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setFile(null)}
-                  disabled={scanning}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+                ))}
               </div>
             )}
             
             <Button 
-              onClick={handleScanInvoice}
+              onClick={handleScanInvoices}
               className="w-full gradient-primary"
-              disabled={!file || scanning}
+              disabled={files.length === 0 || scanning}
             >
               {scanning ? (
                 <>
                   <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
-                  Scanning Invoice...
+                  Scanning {files.length} Invoice{files.length > 1 ? 's' : ''}...
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Scan & Extract Data
+                  Scan & Extract Data ({files.length} file{files.length !== 1 ? 's' : ''})
                 </>
               )}
             </Button>
