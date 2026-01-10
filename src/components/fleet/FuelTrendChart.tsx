@@ -34,11 +34,15 @@ const TIME_PERIODS: { value: TimePeriod; label: string }[] = [
 
 export function FuelTrendChart({ data }: FuelTrendChartProps) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('12m');
-  
+
   const monthsToShow = parseInt(timePeriod);
   const filteredData = data.slice(-monthsToShow);
-  
-  const hasData = filteredData.some(d => d.fuelCost > 0);
+
+  const hasData = filteredData.some((d) => d.fuelCost > 0);
+
+  const monthLabelByKey: Record<string, string> = Object.fromEntries(
+    filteredData.map((d) => [d.monthKey, d.month])
+  );
 
   return (
     <div className="space-y-3">
@@ -48,7 +52,7 @@ export function FuelTrendChart({ data }: FuelTrendChartProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {TIME_PERIODS.map(period => (
+            {TIME_PERIODS.map((period) => (
               <SelectItem key={period.value} value={period.value} className="text-xs">
                 {period.label}
               </SelectItem>
@@ -71,19 +75,16 @@ export function FuelTrendChart({ data }: FuelTrendChartProps) {
                   <stop offset="95%" stopColor="hsl(45, 93%, 47%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="hsl(var(--border))" 
-                vertical={false}
-              />
-              <XAxis 
-                dataKey="month" 
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis
+                dataKey="monthKey"
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
                 tickLine={false}
                 axisLine={false}
+                tickFormatter={(value) => monthLabelByKey[String(value)] ?? String(value)}
               />
-              <YAxis 
+              <YAxis
                 yAxisId="cost"
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
@@ -91,7 +92,7 @@ export function FuelTrendChart({ data }: FuelTrendChartProps) {
                 axisLine={false}
                 tickFormatter={(value) => `£${value}`}
               />
-              <YAxis 
+              <YAxis
                 yAxisId="litres"
                 orientation="right"
                 stroke="hsl(var(--muted-foreground))"
@@ -100,7 +101,7 @@ export function FuelTrendChart({ data }: FuelTrendChartProps) {
                 axisLine={false}
                 tickFormatter={(value) => `${value}L`}
               />
-              <Tooltip 
+              <Tooltip
                 contentStyle={{
                   backgroundColor: 'hsl(var(--card))',
                   border: '1px solid hsl(var(--border))',
@@ -108,19 +109,22 @@ export function FuelTrendChart({ data }: FuelTrendChartProps) {
                   boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                 }}
                 labelStyle={{ color: 'hsl(var(--foreground))' }}
+                labelFormatter={(label) => monthLabelByKey[String(label)] ?? String(label)}
                 formatter={(value: number, name: string) => {
-                  if (name === 'fuelCost') return [`£${value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`, 'Fuel Cost'];
-                  if (name === 'litres') return [`${value.toLocaleString('en-GB', { minimumFractionDigits: 1 })}L`, 'Litres'];
+                  if (name === 'fuelCost')
+                    return [`£${value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`, 'Fuel Cost'];
+                  if (name === 'litres')
+                    return [`${value.toLocaleString('en-GB', { minimumFractionDigits: 1 })}L`, 'Litres'];
                   if (name === 'avgCostPerLitre') return [`£${value.toFixed(3)}/L`, 'Avg Price'];
                   return [value, name];
                 }}
               />
-              <Legend 
+              <Legend
                 formatter={(value) => {
-                  const labels: Record<string, string> = { 
-                    fuelCost: 'Fuel Cost', 
+                  const labels: Record<string, string> = {
+                    fuelCost: 'Fuel Cost',
                     litres: 'Litres',
-                    avgCostPerLitre: 'Avg £/L'
+                    avgCostPerLitre: 'Avg £/L',
                   };
                   return labels[value] || value;
                 }}
