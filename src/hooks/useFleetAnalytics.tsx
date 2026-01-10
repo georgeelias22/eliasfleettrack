@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Vehicle, ServiceRecord, Document, getMOTStatus, getDaysUntilMOT } from '@/types/fleet';
+import { FuelRecord } from '@/types/fuel';
 
 export interface FleetAnalytics {
   totalVehicles: number;
   totalCost: number;
-  costByVehicle: { vehicleId: string; registration: string; make: string; model: string; cost: number }[];
-  costByMonth: { month: string; cost: number }[];
+  totalFuelCost: number;
+  totalTaxCost: number;
+  costByVehicle: { vehicleId: string; registration: string; make: string; model: string; cost: number; fuelCost: number }[];
+  costByMonth: { month: string; cost: number; fuelCost: number }[];
   upcomingMOTs: { vehicle: Vehicle; daysUntil: number }[];
   overdueMOTs: Vehicle[];
   motStats: { valid: number; dueSoon: number; overdue: number; unknown: number };
@@ -40,9 +43,18 @@ export function useFleetAnalytics() {
       
       if (docsError) throw docsError;
 
+      // Fetch all fuel records
+      const { data: fuelRecords, error: fuelError } = await supabase
+        .from('fuel_records')
+        .select('*')
+        .order('fill_date', { ascending: false });
+      
+      if (fuelError) throw fuelError;
+
       const typedVehicles = vehicles as Vehicle[];
       const typedRecords = serviceRecords as ServiceRecord[];
       const typedDocs = documents as Document[];
+      const typedFuel = fuelRecords as FuelRecord[];
 
       // Calculate total costs from service records
       const serviceRecordCosts = typedRecords.reduce((sum, record) => sum + (record.cost || 0), 0);
@@ -50,10 +62,16 @@ export function useFleetAnalytics() {
       // Calculate total costs from documents (AI extracted)
       const documentCosts = typedDocs.reduce((sum, doc) => sum + (doc.extracted_cost || 0), 0);
       
-      // Total cost (use service records as primary, add unique document costs)
-      const totalCost = serviceRecordCosts + documentCosts;
+      // Calculate total fuel costs
+      const totalFuelCost = typedFuel.reduce((sum, record) => sum + record.total_cost, 0);
 
-      // Cost by vehicle
+      // Calculate total tax costs
+      const totalTaxCost = typedVehicles.reduce((sum, v) => sum + (v.annual_tax || 0), 0);
+
+      // Total cost
+      const totalCost = serviceRecordCosts + documentCosts + totalFuelCost + totalTaxCost;
+
+      // Cost by vehicle (including fuel and tax)
       const costByVehicle = typedVehicles.map(vehicle => {
         const vehicleServiceCosts = typedRecords
           .filter(r => r.vehicle_id === vehicle.id)
@@ -61,18 +79,23 @@ export function useFleetAnalytics() {
         const vehicleDocCosts = typedDocs
           .filter(d => d.vehicle_id === vehicle.id)
           .reduce((sum, d) => sum + (d.extracted_cost || 0), 0);
+        const vehicleFuelCosts = typedFuel
+          .filter(f => f.vehicle_id === vehicle.id)
+          .reduce((sum, f) => sum + f.total_cost, 0);
+        const vehicleTax = vehicle.annual_tax || 0;
         
         return {
           vehicleId: vehicle.id,
           registration: vehicle.registration,
           make: vehicle.make,
           model: vehicle.model,
-          cost: vehicleServiceCosts + vehicleDocCosts,
+          cost: vehicleServiceCosts + vehicleDocCosts + vehicleFuelCosts + vehicleTax,
+          fuelCost: vehicleFuelCosts,
         };
       }).sort((a, b) => b.cost - a.cost);
 
       // Cost by month (last 12 months)
-      const costByMonth: { month: string; cost: number }[] = [];
+      const costByMonth: { month: string; cost: number; fuelCost: number }[] = [];
       const now = new Date();
       
       for (let i = 11; i >= 0; i--) {
@@ -87,10 +110,15 @@ export function useFleetAnalytics() {
         const monthDocCost = typedDocs
           .filter(d => d.created_at.startsWith(monthKey))
           .reduce((sum, d) => sum + (d.extracted_cost || 0), 0);
+
+        const monthFuelCost = typedFuel
+          .filter(f => f.fill_date.startsWith(monthKey))
+          .reduce((sum, f) => sum + f.total_cost, 0);
         
         costByMonth.push({
           month: monthLabel,
-          cost: monthServiceCost + monthDocCost,
+          cost: monthServiceCost + monthDocCost + monthFuelCost,
+          fuelCost: monthFuelCost,
         });
       }
 
@@ -132,6 +160,8 @@ export function useFleetAnalytics() {
       return {
         totalVehicles: typedVehicles.length,
         totalCost,
+        totalFuelCost,
+        totalTaxCost,
         costByVehicle,
         costByMonth,
         upcomingMOTs,

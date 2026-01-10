@@ -71,6 +71,53 @@ export type Database = {
           },
         ]
       }
+      fuel_records: {
+        Row: {
+          cost_per_litre: number
+          created_at: string
+          fill_date: string
+          id: string
+          litres: number
+          mileage: number | null
+          notes: string | null
+          station: string | null
+          total_cost: number
+          vehicle_id: string
+        }
+        Insert: {
+          cost_per_litre: number
+          created_at?: string
+          fill_date: string
+          id?: string
+          litres: number
+          mileage?: number | null
+          notes?: string | null
+          station?: string | null
+          total_cost: number
+          vehicle_id: string
+        }
+        Update: {
+          cost_per_litre?: number
+          created_at?: string
+          fill_date?: string
+          id?: string
+          litres?: number
+          mileage?: number | null
+          notes?: string | null
+          station?: string | null
+          total_cost?: number
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_records: {
         Row: {
           cost: number
@@ -123,36 +170,42 @@ export type Database = {
       }
       vehicles: {
         Row: {
+          annual_tax: number | null
           created_at: string
           id: string
           make: string
           model: string
           mot_due_date: string | null
           registration: string
+          tax_paid_monthly: boolean | null
           updated_at: string
           user_id: string
           vin: string | null
           year: number | null
         }
         Insert: {
+          annual_tax?: number | null
           created_at?: string
           id?: string
           make: string
           model: string
           mot_due_date?: string | null
           registration: string
+          tax_paid_monthly?: boolean | null
           updated_at?: string
           user_id: string
           vin?: string | null
           year?: number | null
         }
         Update: {
+          annual_tax?: number | null
           created_at?: string
           id?: string
           make?: string
           model?: string
           mot_due_date?: string | null
           registration?: string
+          tax_paid_monthly?: boolean | null
           updated_at?: string
           user_id?: string
           vin?: string | null

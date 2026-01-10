@@ -7,6 +7,8 @@ export interface Vehicle {
   year: number | null;
   vin: string | null;
   mot_due_date: string | null;
+  annual_tax: number | null;
+  tax_paid_monthly: boolean | null;
   created_at: string;
   updated_at: string;
 }
