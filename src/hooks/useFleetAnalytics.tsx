@@ -129,7 +129,9 @@ export function useFleetAnalytics() {
       
       for (let i = 11; i >= 0; i--) {
         const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthKey = monthDate.toISOString().slice(0, 7);
+        const year = monthDate.getFullYear();
+        const month = String(monthDate.getMonth() + 1).padStart(2, '0');
+        const monthKey = `${year}-${month}`;
         const monthLabel = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
         
         const monthServiceCost = typedRecords
@@ -159,7 +161,9 @@ export function useFleetAnalytics() {
       
       for (let i = 11; i >= 0; i--) {
         const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthKey = monthDate.toISOString().slice(0, 7);
+        const year = monthDate.getFullYear();
+        const month = String(monthDate.getMonth() + 1).padStart(2, '0');
+        const monthKey = `${year}-${month}`;
         const monthLabel = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
         
         const monthFuelRecords = typedFuel.filter(f => f.fill_date.startsWith(monthKey));
