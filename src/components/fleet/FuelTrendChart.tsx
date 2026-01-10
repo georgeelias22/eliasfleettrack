@@ -38,6 +38,9 @@ export function FuelTrendChart({ data }: FuelTrendChartProps) {
   const monthsToShow = parseInt(timePeriod);
   const filteredData = data.slice(-monthsToShow);
 
+  // Debug: log the actual chart data
+  console.log('FuelTrendChart data:', filteredData.map(d => ({ month: d.month, fuelCost: d.fuelCost, litres: d.litres })));
+
   const hasData = filteredData.some((d) => d.fuelCost > 0);
 
   const monthLabelByKey: Record<string, string> = Object.fromEntries(
