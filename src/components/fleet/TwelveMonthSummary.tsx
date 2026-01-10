@@ -31,9 +31,11 @@ export function TwelveMonthSummary({
 
   const hasMotIssues = motOverdue > 0;
   const motTotal = motDueSoon + motOverdue;
+  const avgCostPerVehicle = vehicleCount > 0 ? totalCost / vehicleCount : 0;
 
   const items = [
     { label: 'Total Fleet Cost', value: formatCurrency(totalCost), icon: TrendingUp, color: 'text-primary', bgColor: 'bg-primary/10' },
+    { label: 'Avg Cost/Vehicle', value: formatCurrency(avgCostPerVehicle), icon: Car, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10' },
     { label: 'Fuel', value: formatCurrency(fuelCost), icon: Fuel, color: 'text-amber-500', bgColor: 'bg-amber-500/10' },
     { label: 'Service & Repairs', value: formatCurrency(serviceCost), icon: Wrench, color: 'text-sky-500', bgColor: 'bg-sky-500/10' },
     { label: 'Finance', value: formatCurrency(financeCost), icon: PoundSterling, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' },
