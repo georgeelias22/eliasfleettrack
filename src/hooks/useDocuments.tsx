@@ -105,7 +105,7 @@ export function useScanDocument() {
       const { error: updateError } = await supabase
         .from('documents')
         .update({
-          ai_extracted_data: extractedData as unknown as Record<string, unknown>,
+          ai_extracted_data: extractedData ? JSON.parse(JSON.stringify(extractedData)) : null,
           extracted_cost: extractedData?.totalCost ?? null,
           processing_status: 'completed',
         })
