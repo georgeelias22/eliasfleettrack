@@ -14,7 +14,7 @@ export interface FleetAnalytics {
   totalFinanceCost: number;
   costByVehicle: { vehicleId: string; registration: string; make: string; model: string; cost: number; fuelCost: number; financeCost: number }[];
   costByMonth: { month: string; cost: number; fuelCost: number; financeCost: number }[];
-  fuelByMonth: { month: string; fuelCost: number; litres: number; avgCostPerLitre: number; fillCount: number }[];
+  fuelByMonth: { month: string; monthKey: string; fuelCost: number; litres: number; avgCostPerLitre: number; fillCount: number }[];
   upcomingMOTs: { vehicle: Vehicle; daysUntil: number }[];
   overdueMOTs: Vehicle[];
   motStats: { valid: number; dueSoon: number; overdue: number; unknown: number };
@@ -147,7 +147,7 @@ export function useFleetAnalytics() {
       }
 
       // Fuel by month (last 12 months) - detailed fuel analytics
-      const fuelByMonth: { month: string; fuelCost: number; litres: number; avgCostPerLitre: number; fillCount: number }[] = [];
+      const fuelByMonth: { month: string; monthKey: string; fuelCost: number; litres: number; avgCostPerLitre: number; fillCount: number }[] = [];
       
       for (let i = 11; i >= 0; i--) {
         const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -161,8 +161,9 @@ export function useFleetAnalytics() {
         
         fuelByMonth.push({
           month: monthLabel,
-          fuelCost: monthFuelCost,
-          litres: monthLitres,
+          monthKey: monthKey,
+          fuelCost: Math.round(monthFuelCost * 100) / 100,
+          litres: Math.round(monthLitres * 100) / 100,
           avgCostPerLitre: monthAvgCostPerLitre,
           fillCount: monthFuelRecords.length,
         });
