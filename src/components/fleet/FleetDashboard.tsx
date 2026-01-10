@@ -98,7 +98,7 @@ export function FleetDashboard() {
       </div>
 
       {/* Fuel Charts Row - Hidden on Mobile */}
-      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Fuel Trend Chart */}
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
@@ -127,7 +127,7 @@ export function FleetDashboard() {
       </div>
 
       {/* Charts Row - Hidden on Mobile */}
-      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Cost Trend Chart */}
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
@@ -215,7 +215,7 @@ function FleetDashboardSkeleton() {
       </Card>
       
       {/* Charts Skeleton - Hidden on Mobile */}
-      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border-border/50">
           <CardContent className="p-6">
             <Skeleton className="h-[200px] w-full" />
