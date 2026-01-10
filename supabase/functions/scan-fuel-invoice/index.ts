@@ -94,30 +94,35 @@ CRITICAL - UK FUELS / FUEL CARD INVOICE FORMAT:
 These invoices have a "Transaction Detail" table with columns that can be confusing:
 - "Quantity" column = LITRES of fuel (e.g., 54.75, 95.42, 65.51)
 - "PPL" column = Price Per Litre in PENCE (e.g., 116.42 means £1.1642 per litre, 119.08 means £1.1908)
-- "Net Amount £" column = TOTAL COST in pounds (e.g., 63.74, 112.05, 78.01)
+- "Net Amount £" column = Cost BEFORE VAT in pounds
 - "Date" column = The ACTUAL TRANSACTION DATE when fuel was purchased (USE THIS as the fill date, NOT the invoice date!)
 
 CRITICAL CONVERSION: PPL is in PENCE! Divide by 100 to get pounds.
 - PPL 116.42 = £1.1642 per litre
 - PPL 119.08 = £1.1908 per litre
 
-VALIDATION FORMULA: Net Amount ≈ Quantity × (PPL ÷ 100)
-Example: 54.75 litres × (116.42 ÷ 100) = 54.75 × 1.1642 = £63.74 ✓
+CRITICAL - VAT HANDLING:
+UK fuel invoices typically show NET amounts (before VAT). You MUST add 20% VAT to get the actual cost paid:
+- netCostPerLitre: The PPL ÷ 100 (e.g., 116.42 → 1.1642)
+- costPerLitre: netCostPerLitre × 1.2 (add 20% VAT, e.g., 1.1642 × 1.2 = 1.397)
+- netAmount: From the "Net Amount £" column
+- totalCost: netAmount × 1.2 (add 20% VAT, e.g., 63.74 × 1.2 = 76.49)
 
 For EACH transaction row, extract:
 - transactionDate: The DATE from the transaction row (e.g., "06/10/2025" → "2025-10-06") - THIS IS THE FILL DATE
 - registration: Vehicle registration number
 - litres: From the "Quantity" column (the fuel volume)
-- costPerLitre: PPL divided by 100 to convert pence to pounds (e.g., 116.42 → 1.1642)
-- totalCost: From the "Net Amount £" column
+- costPerLitre: (PPL ÷ 100) × 1.2 to include VAT
+- totalCost: Net Amount × 1.2 to include VAT (this is what was actually paid)
 - mileage: If shown
 - station: The station name for this specific transaction
 
 Also extract:
 - invoiceDate: The invoice date (for reference only, not used for fill dates)
-- invoiceTotal: Total invoice amount
+- invoiceTotal: Total GROSS invoice amount (including VAT) - look for "Gross Amount" or "Total Invoice Amount"
 
-IMPORTANT: Each line item should have its OWN transactionDate - do not use the invoice date!`;
+IMPORTANT: Each line item should have its OWN transactionDate - do not use the invoice date!
+IMPORTANT: Always return costs INCLUDING VAT (multiply net by 1.2)!`;
 
     const messages: any[] = [
       { role: "system", content: systemPrompt },
@@ -249,22 +254,22 @@ IMPORTANT: Each line item should have its OWN transactionDate - do not use the i
         console.log(`  📅 Transaction Date: ${item.transactionDate}`);
         console.log(`  🚗 Registration: ${item.registration}`);
         console.log(`  ⛽ Litres: ${item.litres}`);
-        console.log(`  💷 Cost per litre: £${item.costPerLitre}`);
-        console.log(`  💰 Total cost: £${item.totalCost}`);
+        console.log(`  💷 Cost per litre (inc VAT): £${item.costPerLitre?.toFixed(4) || 'N/A'}`);
+        console.log(`  💰 Total cost (inc VAT): £${item.totalCost?.toFixed(2) || 'N/A'}`);
         console.log(`  ⛽ Station: ${item.station || 'N/A'}`);
         console.log(`  📏 Mileage: ${item.mileage || 'N/A'}`);
         
-        // Validation check
+        // Validation check - with VAT included, litres × costPerLitre should ≈ totalCost
         if (item.litres && item.costPerLitre && item.totalCost) {
           const calculated = item.litres * item.costPerLitre;
           const diff = Math.abs(calculated - item.totalCost);
-          const valid = diff < 1; // Allow £1 tolerance
-          console.log(`  ✅ Validation: ${item.litres} × £${item.costPerLitre} = £${calculated.toFixed(2)} (${valid ? 'VALID' : '⚠️ MISMATCH - diff: £' + diff.toFixed(2)})`);
+          const valid = diff < 2; // Allow £2 tolerance for rounding
+          console.log(`  ✅ Validation: ${item.litres} × £${item.costPerLitre?.toFixed(4)} = £${calculated.toFixed(2)} (${valid ? 'VALID' : '⚠️ MISMATCH - diff: £' + diff.toFixed(2)})`);
         }
         
-        // Range checks - now expecting correct PPL values
-        if (item.costPerLitre < 1.00 || item.costPerLitre > 2.00) {
-          console.log(`  ⚠️ WARNING: Cost per litre £${item.costPerLitre} is outside typical UK range (£1.00-£2.00)`);
+        // Range checks - with 20% VAT, expect £1.20-£2.40 range
+        if (item.costPerLitre && (item.costPerLitre < 1.20 || item.costPerLitre > 2.40)) {
+          console.log(`  ⚠️ WARNING: Cost per litre £${item.costPerLitre?.toFixed(4)} is outside typical UK range inc VAT (£1.20-£2.40)`);
         }
         if (item.litres > 150) {
           console.log(`  ⚠️ WARNING: Litres ${item.litres} seems high for a single fill-up`);
