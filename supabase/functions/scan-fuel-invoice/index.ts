@@ -248,6 +248,10 @@ IMPORTANT: Always return costs INCLUDING VAT (multiply net by 1.2)!`;
     console.log("💰 Invoice Total:", extractedData?.invoiceTotal);
     console.log("📋 Number of line items:", extractedData?.lineItems?.length || 0);
     
+    // Validate and filter line items - reject invalid ones
+    const validatedLineItems: any[] = [];
+    const rejectedLineItems: any[] = [];
+    
     if (extractedData?.lineItems) {
       extractedData.lineItems.forEach((item: any, index: number) => {
         console.log(`\n--- Line Item ${index + 1} ---`);
@@ -259,22 +263,80 @@ IMPORTANT: Always return costs INCLUDING VAT (multiply net by 1.2)!`;
         console.log(`  ⛽ Station: ${item.station || 'N/A'}`);
         console.log(`  📏 Mileage: ${item.mileage || 'N/A'}`);
         
-        // Validation check - with VAT included, litres × costPerLitre should ≈ totalCost
+        const issues: string[] = [];
+        
+        // Required fields check
+        if (!item.transactionDate || !item.registration || !item.litres || !item.costPerLitre || !item.totalCost) {
+          issues.push('Missing required fields');
+        }
+        
+        // Math validation - litres × costPerLitre should ≈ totalCost (within 5% or £2)
         if (item.litres && item.costPerLitre && item.totalCost) {
           const calculated = item.litres * item.costPerLitre;
           const diff = Math.abs(calculated - item.totalCost);
-          const valid = diff < 2; // Allow £2 tolerance for rounding
-          console.log(`  ✅ Validation: ${item.litres} × £${item.costPerLitre?.toFixed(4)} = £${calculated.toFixed(2)} (${valid ? 'VALID' : '⚠️ MISMATCH - diff: £' + diff.toFixed(2)})`);
+          const percentDiff = (diff / item.totalCost) * 100;
+          const valid = diff < 2 || percentDiff < 5;
+          console.log(`  🔢 Validation: ${item.litres} × £${item.costPerLitre?.toFixed(4)} = £${calculated.toFixed(2)} vs £${item.totalCost?.toFixed(2)} (diff: £${diff.toFixed(2)}, ${percentDiff.toFixed(1)}%)`);
+          
+          if (!valid) {
+            issues.push(`Math mismatch: calculated £${calculated.toFixed(2)} vs reported £${item.totalCost?.toFixed(2)}`);
+          }
         }
         
-        // Range checks - with 20% VAT, expect £1.20-£2.40 range
-        if (item.costPerLitre && (item.costPerLitre < 1.20 || item.costPerLitre > 2.40)) {
-          console.log(`  ⚠️ WARNING: Cost per litre £${item.costPerLitre?.toFixed(4)} is outside typical UK range inc VAT (£1.20-£2.40)`);
+        // Range checks - with 20% VAT, expect £1.10-£2.50 range for UK fuel
+        if (item.costPerLitre && (item.costPerLitre < 1.10 || item.costPerLitre > 2.50)) {
+          issues.push(`Cost per litre £${item.costPerLitre?.toFixed(4)} outside UK range (£1.10-£2.50)`);
         }
-        if (item.litres > 150) {
-          console.log(`  ⚠️ WARNING: Litres ${item.litres} seems high for a single fill-up`);
+        
+        // Litres sanity check - most vehicle tanks are under 100L
+        if (item.litres && item.litres > 150) {
+          issues.push(`Litres ${item.litres} exceeds maximum (150L)`);
+        }
+        if (item.litres && item.litres < 1) {
+          issues.push(`Litres ${item.litres} too small (< 1L)`);
+        }
+        
+        // Total cost sanity check
+        if (item.totalCost && (item.totalCost < 1 || item.totalCost > 500)) {
+          issues.push(`Total cost £${item.totalCost} outside expected range (£1-£500)`);
+        }
+        
+        // Date validation
+        if (item.transactionDate) {
+          const dateMatch = item.transactionDate.match(/^\d{4}-\d{2}-\d{2}$/);
+          if (!dateMatch) {
+            issues.push(`Invalid date format: ${item.transactionDate}`);
+          } else {
+            const txDate = new Date(item.transactionDate);
+            const now = new Date();
+            const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
+            if (txDate > now) {
+              issues.push(`Future date: ${item.transactionDate}`);
+            }
+            if (txDate < twoYearsAgo) {
+              issues.push(`Date too old: ${item.transactionDate}`);
+            }
+          }
+        }
+        
+        if (issues.length > 0) {
+          console.log(`  ❌ REJECTED: ${issues.join('; ')}`);
+          rejectedLineItems.push({ ...item, rejectionReasons: issues });
+        } else {
+          console.log(`  ✅ VALID`);
+          validatedLineItems.push(item);
         }
       });
+    }
+    
+    console.log(`\n========== VALIDATION SUMMARY ==========`);
+    console.log(`✅ Valid line items: ${validatedLineItems.length}`);
+    console.log(`❌ Rejected line items: ${rejectedLineItems.length}`);
+    
+    // Replace lineItems with only validated ones
+    if (extractedData) {
+      extractedData.lineItems = validatedLineItems;
+      extractedData.rejectedLineItems = rejectedLineItems;
     }
     
     console.log("\n========== FUEL INVOICE SCAN END ==========");
