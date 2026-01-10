@@ -5,6 +5,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Maximum characters to send to AI (roughly 200k tokens = ~800k chars for safety margin)
+const MAX_CONTENT_LENGTH = 500000;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -25,6 +28,31 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Check if content is too large (base64 images can be huge)
+    let processedContent = fileContent;
+    let isImage = false;
+    
+    if (fileContent.startsWith('data:image/')) {
+      isImage = true;
+      // For images, we'll use multimodal capabilities with the image URL
+      // But first check if it's not too large
+      if (fileContent.length > MAX_CONTENT_LENGTH * 2) {
+        return new Response(
+          JSON.stringify({ 
+            error: "Image file is too large for AI processing. Please upload a smaller image (under 5MB) or use a PDF/text document instead.",
+            userMessage: true 
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      // For text content, truncate if needed
+      if (fileContent.length > MAX_CONTENT_LENGTH) {
+        processedContent = fileContent.substring(0, MAX_CONTENT_LENGTH) + "\n\n[Content truncated due to length...]";
+        console.log(`Content truncated from ${fileContent.length} to ${MAX_CONTENT_LENGTH} characters`);
+      }
+    }
+
     const systemPrompt = `You are an expert document analyzer specializing in vehicle service records, invoices, and MOT certificates. 
     
 Analyze the provided document content and extract the following information:
@@ -37,19 +65,28 @@ Analyze the provided document content and extract the following information:
 - Description of work performed
 - Any individual line items with their costs
 
-Return the data as a JSON object with this structure:
-{
-  "totalCost": number or null,
-  "serviceType": string or null,
-  "serviceDate": "YYYY-MM-DD" or null,
-  "provider": string or null,
-  "registration": string or null,
-  "mileage": number or null,
-  "description": string or null,
-  "lineItems": [{ "description": string, "cost": number }] or []
-}
-
 If you cannot determine a value, use null. Always try to extract as much information as possible.`;
+
+    // Build messages based on content type
+    const messages: any[] = [
+      { role: "system", content: systemPrompt },
+    ];
+
+    if (isImage) {
+      // Use multimodal message for images
+      messages.push({
+        role: "user",
+        content: [
+          { type: "text", text: `Please analyze this service document image (${fileName}) and extract the cost and service information:` },
+          { type: "image_url", image_url: { url: processedContent } }
+        ]
+      });
+    } else {
+      messages.push({
+        role: "user",
+        content: `Please analyze this document (${fileName}):\n\n${processedContent}`
+      });
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -58,11 +95,8 @@ If you cannot determine a value, use null. Always try to extract as much informa
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Please analyze this document (${fileName}):\n\n${fileContent}` },
-        ],
+        model: "google/gemini-2.5-flash",
+        messages,
         tools: [
           {
             type: "function",
@@ -101,20 +135,27 @@ If you cannot determine a value, use null. Always try to extract as much informa
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI gateway error:", response.status, errorText);
+      
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment.", userMessage: true }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "AI usage limit reached. Please add credits." }),
+          JSON.stringify({ error: "AI usage limit reached. Please add credits.", userMessage: true }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      if (errorText.includes("context length") || errorText.includes("too many tokens")) {
+        return new Response(
+          JSON.stringify({ error: "Document is too large to process. Please try a smaller file.", userMessage: true }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       throw new Error("Failed to analyze document");
     }
 

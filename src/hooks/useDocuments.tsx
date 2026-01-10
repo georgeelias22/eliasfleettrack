@@ -99,6 +99,15 @@ export function useScanDocument() {
         throw error;
       }
       
+      // Check for user-friendly error messages
+      if (data?.error) {
+        await supabase
+          .from('documents')
+          .update({ processing_status: 'failed' })
+          .eq('id', documentId);
+        throw new Error(data.error);
+      }
+      
       const extractedData = data.data as DocumentExtractedData;
       
       // Update document with extracted data
