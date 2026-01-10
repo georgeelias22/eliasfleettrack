@@ -10,7 +10,6 @@ interface MileagePayload {
   daily_mileage: number;
   record_date?: string;
   odometer_reading?: number;
-  user_id: string;
 }
 
 Deno.serve(async (req) => {
@@ -19,25 +18,60 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Authenticate the request
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Missing or invalid authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
     );
 
-    const payload: MileagePayload = await req.json();
-    console.log('Received mileage payload:', payload);
-
-    const { registration, daily_mileage, record_date, odometer_reading, user_id } = payload;
-
-    if (!registration || daily_mileage === undefined || !user_id) {
+    // Verify the JWT and get the authenticated user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: registration, daily_mileage, user_id' }),
+        JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: No user ID in token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const payload: MileagePayload = await req.json();
+    console.log('Received mileage payload for user:', userId, payload);
+
+    const { registration, daily_mileage, record_date, odometer_reading } = payload;
+
+    if (!registration || daily_mileage === undefined) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: registration, daily_mileage' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Find vehicle by registration and verify ownership
-    const { data: vehicle, error: vehicleError } = await supabaseClient
+    // Use service role client for database operations (RLS bypass)
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Find vehicle by registration and verify ownership using authenticated user's ID
+    const { data: vehicle, error: vehicleError } = await serviceClient
       .from('vehicles')
       .select('id, user_id')
       .ilike('registration', registration.replace(/\s+/g, ''))
@@ -51,8 +85,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify user owns this vehicle
-    if (vehicle.user_id !== user_id) {
+    // Verify authenticated user owns this vehicle
+    if (vehicle.user_id !== userId) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized: vehicle does not belong to user' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -62,7 +96,7 @@ Deno.serve(async (req) => {
     const recordDate = record_date || new Date().toISOString().split('T')[0];
 
     // Upsert mileage record (update if date exists, insert if not)
-    const { data: mileageRecord, error: insertError } = await supabaseClient
+    const { data: mileageRecord, error: insertError } = await serviceClient
       .from('mileage_records')
       .upsert({
         vehicle_id: vehicle.id,
