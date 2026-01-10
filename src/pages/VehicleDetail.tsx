@@ -2,18 +2,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useVehicle, useUpdateVehicle, useDeleteVehicle } from '@/hooks/useVehicles';
 import { useServiceRecords } from '@/hooks/useServiceRecords';
 import { useDocuments } from '@/hooks/useDocuments';
+import { useFuelRecords } from '@/hooks/useFuelRecords';
 import { useAuth } from '@/hooks/useAuth';
 import { MOTStatusBadge } from '@/components/fleet/MOTStatusBadge';
 import { DocumentUpload } from '@/components/fleet/DocumentUpload';
 import { DocumentList } from '@/components/fleet/DocumentList';
 import { CostSummary } from '@/components/fleet/CostSummary';
+import { AddFuelRecordDialog } from '@/components/fleet/AddFuelRecordDialog';
+import { FuelRecordList } from '@/components/fleet/FuelRecordList';
+import { VehicleTaxSettings } from '@/components/fleet/VehicleTaxSettings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Car, Loader2, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Car, Loader2, Save, Trash2, Fuel } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
 import {
@@ -37,6 +41,7 @@ export default function VehicleDetail() {
   const { data: vehicle, isLoading } = useVehicle(id || '');
   const { data: serviceRecords = [] } = useServiceRecords(id);
   const { data: documents = [] } = useDocuments(id);
+  const { data: fuelRecords = [] } = useFuelRecords(id);
   const updateVehicle = useUpdateVehicle();
   const deleteVehicle = useDeleteVehicle();
 
@@ -88,6 +93,9 @@ export default function VehicleDetail() {
     }
   };
 
+  // Calculate fuel totals
+  const totalFuelCost = fuelRecords.reduce((sum, r) => sum + r.total_cost, 0);
+
   return (
     <div className="min-h-screen gradient-hero">
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
@@ -114,6 +122,10 @@ export default function VehicleDetail() {
         <Tabs defaultValue="documents" className="space-y-6">
           <TabsList className="bg-secondary">
             <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="fuel" className="gap-1">
+              <Fuel className="w-4 h-4" />
+              Fuel
+            </TabsTrigger>
             <TabsTrigger value="costs">Costs</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
@@ -130,8 +142,21 @@ export default function VehicleDetail() {
             <DocumentList documents={documents} vehicleId={vehicle.id} />
           </TabsContent>
 
+          <TabsContent value="fuel" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Fuel Records</h3>
+                <p className="text-sm text-muted-foreground">
+                  Track fuel expenses • Total: <span className="text-primary font-medium">£{totalFuelCost.toFixed(2)}</span>
+                </p>
+              </div>
+              <AddFuelRecordDialog vehicleId={vehicle.id} />
+            </div>
+            <FuelRecordList records={fuelRecords} vehicleId={vehicle.id} />
+          </TabsContent>
+
           <TabsContent value="costs">
-            <CostSummary documents={documents} serviceRecords={serviceRecords} />
+            <CostSummary documents={documents} serviceRecords={serviceRecords} fuelRecords={fuelRecords} />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
@@ -147,6 +172,9 @@ export default function VehicleDetail() {
                 </Button>
               </CardContent>
             </Card>
+
+            <VehicleTaxSettings vehicle={vehicle} />
+
             <Card className="border-destructive/50">
               <CardHeader><CardTitle className="text-destructive">Danger Zone</CardTitle></CardHeader>
               <CardContent>

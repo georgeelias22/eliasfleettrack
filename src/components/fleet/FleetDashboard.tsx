@@ -45,32 +45,25 @@ export function FleetDashboard() {
       bgClass: 'bg-accent/10',
     },
     {
-      label: 'MOT Valid',
-      value: analytics.motStats.valid,
-      icon: CheckCircle,
-      className: 'text-status-valid',
-      bgClass: 'bg-status-valid/10',
+      label: 'Fuel Costs',
+      value: `£${analytics.totalFuelCost.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      icon: TrendingUp,
+      className: 'text-amber-500',
+      bgClass: 'bg-amber-500/10',
     },
     {
       label: 'MOT Due Soon',
-      value: analytics.motStats.dueSoon,
-      icon: Clock,
-      className: 'text-status-warning',
-      bgClass: 'bg-status-warning/10',
-    },
-    {
-      label: 'MOT Overdue',
-      value: analytics.motStats.overdue,
-      icon: AlertTriangle,
-      className: 'text-status-danger',
-      bgClass: 'bg-status-danger/10',
+      value: analytics.motStats.dueSoon + analytics.motStats.overdue,
+      icon: analytics.motStats.overdue > 0 ? AlertTriangle : Clock,
+      className: analytics.motStats.overdue > 0 ? 'text-status-danger' : 'text-status-warning',
+      bgClass: analytics.motStats.overdue > 0 ? 'bg-status-danger/10' : 'bg-status-warning/10',
     },
   ];
 
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map((stat) => (
           <Card key={stat.label} className="border-border/50 gradient-card overflow-hidden">
             <CardContent className="p-4">

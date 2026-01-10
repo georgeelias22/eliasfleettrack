@@ -41,6 +41,8 @@ export function AddVehicleDialog({ trigger }: AddVehicleDialogProps) {
         year: year ? parseInt(year) : null,
         vin: vin || null,
         mot_due_date: motDueDate || null,
+        annual_tax: null,
+        tax_paid_monthly: false,
       });
       
       toast({
