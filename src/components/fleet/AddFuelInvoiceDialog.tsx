@@ -413,7 +413,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto overscroll-contain touch-pan-y">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-primary" />
@@ -551,8 +551,8 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                   </Button>
                 </div>
                 
-                <ScrollArea className="max-h-[250px]">
-                  <div className="space-y-3 pr-4">
+                <div className="max-h-[250px] overflow-y-auto overscroll-contain touch-pan-y">
+                  <div className="space-y-3 pr-2">
                     {lineItems.map((item, index) => (
                       <div 
                         key={item.id} 
@@ -643,7 +643,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
 
               <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
