@@ -4,7 +4,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useUploadDocument, useScanDocument } from '@/hooks/useDocuments';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileText, Loader2, Sparkles, X } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { checkMultipleFilesForDuplicates, formatDuplicateMessage } from '@/hooks/useDuplicateCheck';
+import { Upload, FileText, Loader2, Sparkles, X, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DocumentUploadProps {
@@ -16,14 +18,44 @@ export function DocumentUpload({ vehicleId, onUploadComplete }: DocumentUploadPr
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
   
   const uploadDocument = useUploadDocument();
   const scanDocument = useScanDocument();
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles(prev => [...prev, ...acceptedFiles]);
-  }, []);
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (!user) {
+      setFiles(prev => [...prev, ...acceptedFiles]);
+      return;
+    }
+
+    setCheckingDuplicates(true);
+    try {
+      const duplicateResults = await checkMultipleFilesForDuplicates(acceptedFiles, user.id);
+      const duplicates = duplicateResults.filter(r => r.result.isDuplicate);
+      const nonDuplicates = duplicateResults.filter(r => !r.result.isDuplicate);
+
+      if (duplicates.length > 0) {
+        const message = formatDuplicateMessage(duplicates);
+        toast({
+          title: 'Duplicate files detected',
+          description: message,
+          variant: 'destructive',
+        });
+      }
+
+      if (nonDuplicates.length > 0) {
+        setFiles(prev => [...prev, ...nonDuplicates.map(r => r.file)]);
+      }
+    } catch (error) {
+      // If duplicate check fails, still allow the upload
+      setFiles(prev => [...prev, ...acceptedFiles]);
+    } finally {
+      setCheckingDuplicates(false);
+    }
+  }, [user, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -214,9 +246,14 @@ export function DocumentUpload({ vehicleId, onUploadComplete }: DocumentUploadPr
             <Button 
               onClick={handleUpload} 
               className="w-full mt-4 gradient-primary"
-              disabled={uploading || scanning}
+              disabled={uploading || scanning || checkingDuplicates}
             >
-              {uploading ? (
+              {checkingDuplicates ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Checking for duplicates...
+                </>
+              ) : uploading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Uploading...

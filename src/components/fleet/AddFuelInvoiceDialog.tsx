@@ -3,6 +3,8 @@ import { useDropzone } from 'react-dropzone';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useCreateFuelRecord } from '@/hooks/useFuelRecords';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { checkMultipleFilesForDuplicates, formatDuplicateMessage } from '@/hooks/useDuplicateCheck';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -60,15 +62,45 @@ export function AddFuelInvoiceDialog() {
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   
   const { data: vehicles = [] } = useVehicles();
   const createFuelRecord = useCreateFuelRecord();
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles(prev => [...prev, ...acceptedFiles]);
-  }, []);
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (!user) {
+      setFiles(prev => [...prev, ...acceptedFiles]);
+      return;
+    }
+
+    setCheckingDuplicates(true);
+    try {
+      const duplicateResults = await checkMultipleFilesForDuplicates(acceptedFiles, user.id);
+      const duplicates = duplicateResults.filter(r => r.result.isDuplicate);
+      const nonDuplicates = duplicateResults.filter(r => !r.result.isDuplicate);
+
+      if (duplicates.length > 0) {
+        const message = formatDuplicateMessage(duplicates);
+        toast({
+          title: 'Duplicate files detected',
+          description: message,
+          variant: 'destructive',
+        });
+      }
+
+      if (nonDuplicates.length > 0) {
+        setFiles(prev => [...prev, ...nonDuplicates.map(r => r.file)]);
+      }
+    } catch (error) {
+      // If duplicate check fails, still allow the upload
+      setFiles(prev => [...prev, ...acceptedFiles]);
+    } finally {
+      setCheckingDuplicates(false);
+    }
+  }, [user, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -451,9 +483,14 @@ export function AddFuelInvoiceDialog() {
             <Button 
               onClick={handleScanInvoices}
               className="w-full gradient-primary"
-              disabled={files.length === 0 || scanning}
+              disabled={files.length === 0 || scanning || checkingDuplicates}
             >
-              {scanning ? (
+              {checkingDuplicates ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Checking for duplicates...
+                </>
+              ) : scanning ? (
                 <>
                   <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
                   Scanning {files.length} Invoice{files.length > 1 ? 's' : ''}...
