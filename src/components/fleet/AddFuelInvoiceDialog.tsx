@@ -67,6 +67,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   
@@ -184,63 +185,78 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
     if (files.length === 0) return;
     
     setScanning(true);
+    setScanProgress({ current: 0, total: files.length });
     
     try {
       const vehicleRegistrations = vehicles.map(v => v.registration);
       const allLineItems: FuelLineItem[] = [];
       let lastDate = '';
       let lastStation = '';
-      
-      // Process all files in parallel
-      const results = await Promise.allSettled(
-        files.map(async (f) => {
-          const fileContent = await readFileAsText(f);
-          const { data, error } = await supabase.functions.invoke('scan-fuel-invoice', {
-            body: { 
-              fileContent, 
-              fileName: f.name,
-              vehicleRegistrations,
-            },
-          });
-          
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-          
-          return data?.data as ExtractedFuelData;
-        })
-      );
-      
       let successCount = 0;
       let totalItems = 0;
       
-      results.forEach((result) => {
-        if (result.status === 'fulfilled' && result.value) {
-          const extractedData = result.value;
-          successCount++;
-          
-          if (extractedData.invoiceDate) lastDate = extractedData.invoiceDate;
-          
-          if (extractedData.lineItems && extractedData.lineItems.length > 0) {
-            extractedData.lineItems.forEach(item => {
-              // Use transaction date for the fill date (when fuel was actually purchased)
-              const fillDate = item.transactionDate || extractedData.invoiceDate || '';
-              if (item.station) lastStation = item.station;
-              
-              allLineItems.push({
-                id: crypto.randomUUID(),
-                vehicleId: matchVehicleByRegistration(item.registration || ''),
-                registration: item.registration || '',
-                litres: item.litres?.toString() || '',
-                costPerLitre: item.costPerLitre?.toString() || '',
-                mileage: item.mileage?.toString() || '',
-                invoiceDate: fillDate,
-                station: item.station || '',
-              });
-              totalItems++;
+      // Process files sequentially in small batches to avoid UI freeze
+      const BATCH_SIZE = 2;
+      
+      for (let i = 0; i < files.length; i += BATCH_SIZE) {
+        const batch = files.slice(i, i + BATCH_SIZE);
+        
+        // Process batch in parallel
+        const results = await Promise.allSettled(
+          batch.map(async (f) => {
+            const fileContent = await readFileAsText(f);
+            const { data, error } = await supabase.functions.invoke('scan-fuel-invoice', {
+              body: { 
+                fileContent, 
+                fileName: f.name,
+                vehicleRegistrations,
+              },
             });
+            
+            if (error) throw error;
+            if (data?.error) throw new Error(data.error);
+            
+            return data?.data as ExtractedFuelData;
+          })
+        );
+        
+        // Process results from this batch
+        results.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value) {
+            const extractedData = result.value;
+            successCount++;
+            
+            if (extractedData.invoiceDate) lastDate = extractedData.invoiceDate;
+            
+            if (extractedData.lineItems && extractedData.lineItems.length > 0) {
+              extractedData.lineItems.forEach(item => {
+                const fillDate = item.transactionDate || extractedData.invoiceDate || '';
+                if (item.station) lastStation = item.station;
+                
+                allLineItems.push({
+                  id: crypto.randomUUID(),
+                  vehicleId: matchVehicleByRegistration(item.registration || ''),
+                  registration: item.registration || '',
+                  litres: item.litres?.toString() || '',
+                  costPerLitre: item.costPerLitre?.toString() || '',
+                  mileage: item.mileage?.toString() || '',
+                  invoiceDate: fillDate,
+                  station: item.station || '',
+                });
+                totalItems++;
+              });
+            }
           }
+        });
+        
+        // Update progress after each batch
+        setScanProgress({ current: Math.min(i + BATCH_SIZE, files.length), total: files.length });
+        
+        // Small delay to allow UI to breathe
+        if (i + BATCH_SIZE < files.length) {
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
-      });
+      }
       
       if (allLineItems.length > 0) {
         setLineItems(allLineItems);
@@ -268,6 +284,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
       });
     } finally {
       setScanning(false);
+      setScanProgress({ current: 0, total: 0 });
     }
   };
 
@@ -503,7 +520,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
               ) : scanning ? (
                 <>
                   <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
-                  Scanning {files.length} Invoice{files.length > 1 ? 's' : ''}...
+                  Scanning {scanProgress.current}/{scanProgress.total} Invoice{files.length > 1 ? 's' : ''}...
                 </>
               ) : (
                 <>
