@@ -21,6 +21,7 @@ import { CostByVehicleChart } from './CostByVehicleChart';
 import { FuelTrendChart } from './FuelTrendChart';
 import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
+import { TwelveMonthSummary } from './TwelveMonthSummary';
 
 export function FleetDashboard() {
   const { data: analytics, isLoading, error } = useFleetAnalytics();
@@ -93,10 +94,26 @@ export function FleetDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* 12 Month Summary */}
+      <div>
+        <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-primary" />
+          12 Month Summary
+        </h3>
+        <TwelveMonthSummary 
+          totalCost={analytics.totalCost}
+          fuelCost={analytics.totalFuelCost}
+          serviceCost={analytics.totalServiceCost}
+          financeCost={analytics.totalFinanceCost}
+          taxCost={analytics.totalTaxCost}
+          vehicleCount={analytics.totalVehicles}
+        />
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {statCards.map((stat) => (
-          <Card key={stat.label} className="border-border/50 gradient-card overflow-hidden">
+          <Card key={stat.label} className="border-border/50 bg-card overflow-hidden">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -115,13 +132,15 @@ export function FleetDashboard() {
       </div>
 
       {/* Fuel Charts Row */}
+
+      {/* Fuel Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Fuel Trend Chart */}
-        <Card className="border-border/50 gradient-card">
+        <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Fuel className="w-4 h-4 text-amber-500" />
-              Fuel Spending (Last 12 Months)
+              Fuel Spending
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -130,11 +149,11 @@ export function FleetDashboard() {
         </Card>
 
         {/* Fuel Cost by Vehicle Chart */}
-        <Card className="border-border/50 gradient-card">
+        <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <BarChart3 className="w-4 h-4 text-sky-500" />
-              Fuel Cost by Vehicle (Last 12 Months)
+              Fuel Cost by Vehicle
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -146,11 +165,11 @@ export function FleetDashboard() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Cost Trend Chart */}
-        <Card className="border-border/50 gradient-card">
+        <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <TrendingUp className="w-4 h-4 text-primary" />
-              Total Cost Trends (Last 12 Months)
+              Total Cost Trends
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -159,10 +178,10 @@ export function FleetDashboard() {
         </Card>
 
         {/* Cost by Vehicle Chart */}
-        <Card className="border-border/50 gradient-card">
+        <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <PoundSterling className="w-4 h-4 text-accent" />
+              <PoundSterling className="w-4 h-4 text-primary" />
               Cost by Vehicle
             </CardTitle>
           </CardHeader>
@@ -180,7 +199,7 @@ export function FleetDashboard() {
       {/* Bottom Row - MOTs and Fuel Records */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upcoming MOTs */}
-        <Card className="border-border/50 gradient-card">
+        <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Calendar className="w-4 h-4 text-status-warning" />
@@ -196,7 +215,7 @@ export function FleetDashboard() {
         </Card>
 
         {/* All Fuel Records */}
-        <Card className="border-border/50 gradient-card">
+        <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Receipt className="w-4 h-4 text-amber-500" />

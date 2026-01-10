@@ -6,6 +6,7 @@ import { VehicleCard } from '@/components/fleet/VehicleCard';
 import { AddVehicleDialog } from '@/components/fleet/AddVehicleDialog';
 import { AddFuelInvoiceDialog } from '@/components/fleet/AddFuelInvoiceDialog';
 import { FleetDashboard } from '@/components/fleet/FleetDashboard';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Truck, LogOut, Loader2, LayoutDashboard, Car } from 'lucide-react';
@@ -17,7 +18,7 @@ const Index = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-hero">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -28,8 +29,8 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen gradient-hero">
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border/50 bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
@@ -37,9 +38,10 @@ const Index = () => {
             </div>
             <h1 className="text-xl font-bold text-foreground">FleetTrack Pro</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <AddFuelInvoiceDialog />
             <AddVehicleDialog />
+            <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={signOut}>
               <LogOut className="w-5 h-5" />
             </Button>

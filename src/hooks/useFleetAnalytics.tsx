@@ -7,6 +7,7 @@ export interface FleetAnalytics {
   totalVehicles: number;
   totalCost: number;
   totalFuelCost: number;
+  totalServiceCost: number;
   totalLitres: number;
   avgCostPerLitre: number;
   totalTaxCost: number;
@@ -71,6 +72,9 @@ export function useFleetAnalytics() {
       // Calculate total costs from documents (AI extracted)
       const documentCosts = typedDocs.reduce((sum, doc) => sum + (doc.extracted_cost || 0), 0);
       
+      // Total service cost (service records + document costs)
+      const totalServiceCost = serviceRecordCosts + documentCosts;
+      
       // Calculate total fuel costs and litres
       const totalFuelCost = typedFuel.reduce((sum, record) => sum + record.total_cost, 0);
       const totalLitres = typedFuel.reduce((sum, record) => sum + record.litres, 0);
@@ -83,7 +87,7 @@ export function useFleetAnalytics() {
       const totalFinanceCost = typedVehicles.reduce((sum, v) => sum + ((v.monthly_finance || 0) * 12), 0);
 
       // Total cost
-      const totalCost = serviceRecordCosts + documentCosts + totalFuelCost + totalTaxCost + totalFinanceCost;
+      const totalCost = totalServiceCost + totalFuelCost + totalTaxCost + totalFinanceCost;
 
       // Cost by vehicle (including fuel, tax, and finance)
       const costByVehicle = typedVehicles.map(vehicle => {
@@ -213,6 +217,7 @@ export function useFleetAnalytics() {
         totalVehicles: typedVehicles.length,
         totalCost,
         totalFuelCost,
+        totalServiceCost,
         totalLitres,
         avgCostPerLitre,
         totalTaxCost,
