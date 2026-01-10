@@ -247,27 +247,43 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
     
     try {
       const vehicleRegistrations = vehicles.map(v => v.registration);
+
+      // Ensure we have a signed-in user token for the backend function (otherwise it sends the anon key)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        toast({
+          title: 'Sign in required',
+          description: 'Please sign in before scanning invoices.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const allLineItems: FuelLineItem[] = [];
       let lastDate = '';
       let lastStation = '';
       let successCount = 0;
       let totalItems = 0;
-      
+
       // Process files sequentially in small batches to avoid UI freeze
       const BATCH_SIZE = 2;
-      
+
       for (let i = 0; i < files.length; i += BATCH_SIZE) {
         const batch = files.slice(i, i + BATCH_SIZE);
-        
+
         // Process batch in parallel
         const results = await Promise.allSettled(
           batch.map(async (f) => {
             const fileContent = await readFileAsText(f);
             const { data, error } = await supabase.functions.invoke('scan-fuel-invoice', {
-              body: { 
-                fileContent, 
+              body: {
+                fileContent,
                 fileName: f.name,
                 vehicleRegistrations,
+              },
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
               },
             });
             
