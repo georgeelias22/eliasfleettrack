@@ -92,3 +92,19 @@ export function useDeleteFuelRecord() {
     },
   });
 }
+
+// Check if a fuel record already exists (same vehicle, date, litres within tolerance)
+export function checkFuelRecordDuplicate(
+  existingRecords: FuelRecord[],
+  vehicleId: string,
+  fillDate: string,
+  litres: number
+): FuelRecord | null {
+  const tolerance = 0.5; // litres tolerance
+  
+  return existingRecords.find(record => 
+    record.vehicle_id === vehicleId &&
+    record.fill_date === fillDate &&
+    Math.abs(record.litres - litres) < tolerance
+  ) || null;
+}

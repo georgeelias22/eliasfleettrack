@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useVehicles } from '@/hooks/useVehicles';
-import { useCreateFuelRecord } from '@/hooks/useFuelRecords';
+import { useCreateFuelRecord, useAllFuelRecords, checkFuelRecordDuplicate } from '@/hooks/useFuelRecords';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { checkMultipleFilesForDuplicates, formatDuplicateMessage } from '@/hooks/useDuplicateCheck';
@@ -23,10 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Receipt, Plus, Trash2, Loader2, Fuel, Upload, Sparkles, FileText, X } from 'lucide-react';
+import { Receipt, Plus, Trash2, Loader2, Fuel, Upload, Sparkles, FileText, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 interface FuelLineItem {
   id: string;
@@ -37,6 +39,7 @@ interface FuelLineItem {
   mileage: string;
   invoiceDate: string;
   station: string;
+  isSelected: boolean;
 }
 
 interface ExtractedFuelData {
@@ -63,7 +66,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [station, setStation] = useState('');
   const [lineItems, setLineItems] = useState<FuelLineItem[]>([
-    { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '' }
+    { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '', isSelected: true }
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -72,9 +75,63 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   const [files, setFiles] = useState<File[]>([]);
   
   const { data: vehicles = [] } = useVehicles();
+  const { data: existingFuelRecords = [] } = useAllFuelRecords();
   const createFuelRecord = useCreateFuelRecord();
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Compute which line items are duplicates
+  const duplicateInfo = useMemo(() => {
+    const info: Record<string, { isDuplicate: boolean; existingRecord?: any }> = {};
+    
+    lineItems.forEach(item => {
+      if (item.vehicleId && item.invoiceDate && item.litres) {
+        const existingMatch = checkFuelRecordDuplicate(
+          existingFuelRecords,
+          item.vehicleId,
+          item.invoiceDate,
+          parseFloat(item.litres) || 0
+        );
+        info[item.id] = {
+          isDuplicate: !!existingMatch,
+          existingRecord: existingMatch,
+        };
+      } else {
+        info[item.id] = { isDuplicate: false };
+      }
+    });
+    
+    return info;
+  }, [lineItems, existingFuelRecords]);
+
+  const duplicateCount = useMemo(() => 
+    Object.values(duplicateInfo).filter(d => d.isDuplicate).length,
+  [duplicateInfo]);
+
+  const selectedCount = useMemo(() => 
+    lineItems.filter(item => item.isSelected).length,
+  [lineItems]);
+
+  const toggleItemSelection = (id: string) => {
+    setLineItems(prev => prev.map(item => 
+      item.id === id ? { ...item, isSelected: !item.isSelected } : item
+    ));
+  };
+
+  const selectAllNonDuplicates = () => {
+    setLineItems(prev => prev.map(item => ({
+      ...item,
+      isSelected: !duplicateInfo[item.id]?.isDuplicate
+    })));
+  };
+
+  const selectAll = () => {
+    setLineItems(prev => prev.map(item => ({ ...item, isSelected: true })));
+  };
+
+  const deselectAll = () => {
+    setLineItems(prev => prev.map(item => ({ ...item, isSelected: false })));
+  };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!user) {
@@ -242,6 +299,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                   mileage: item.mileage?.toString() || '',
                   invoiceDate: fillDate,
                   station: item.station || '',
+                  isSelected: true,
                 });
                 totalItems++;
               });
@@ -291,7 +349,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   const addLineItem = () => {
     setLineItems(prev => [
       ...prev,
-      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '' }
+      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '', isSelected: true }
     ]);
   };
 
@@ -357,8 +415,9 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Only submit selected items that have valid data
     const validItems = lineItems.filter(item => 
-      item.vehicleId && item.litres && item.costPerLitre
+      item.isSelected && item.vehicleId && item.litres && item.costPerLitre
     );
 
     if (validItems.length === 0) {
@@ -415,7 +474,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setStation('');
     setLineItems([
-      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '' }
+      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '', isSelected: true }
     ]);
     setFiles([]);
     setActiveTab('upload');
@@ -558,48 +617,99 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Line Items</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addLineItem}
-                    className="gap-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Add Vehicle
-                  </Button>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Label>Line Items</Label>
+                    {duplicateCount > 0 && (
+                      <Badge variant="destructive" className="gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {duplicateCount} duplicate{duplicateCount > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                    <Badge variant="secondary">
+                      {selectedCount} selected
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {duplicateCount > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllNonDuplicates}
+                        className="gap-1 text-xs"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Select non-duplicates
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addLineItem}
+                      className="gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="max-h-[250px] overflow-y-auto overscroll-contain touch-pan-y">
                   <div className="space-y-3 pr-2">
-                    {lineItems.map((item, index) => (
-                      <div 
-                        key={item.id} 
-                        className="p-4 rounded-lg border border-border bg-secondary/30 space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Line {index + 1}
-                            {item.registration && !item.vehicleId && (
-                              <span className="ml-2 text-amber-500">
-                                (Reg: {item.registration} - select vehicle)
-                              </span>
-                            )}
-                          </span>
-                          {lineItems.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => removeLineItem(item.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                    {lineItems.map((item, index) => {
+                      const itemDuplicateInfo = duplicateInfo[item.id];
+                      const isDuplicate = itemDuplicateInfo?.isDuplicate;
+                      
+                      return (
+                        <div 
+                          key={item.id} 
+                          className={cn(
+                            "p-4 rounded-lg border space-y-3 transition-colors",
+                            isDuplicate 
+                              ? "border-destructive/50 bg-destructive/5" 
+                              : item.isSelected 
+                                ? "border-primary/50 bg-primary/5"
+                                : "border-border bg-secondary/30"
                           )}
-                        </div>
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Checkbox
+                                checked={item.isSelected}
+                                onCheckedChange={() => toggleItemSelection(item.id)}
+                                className={cn(
+                                  isDuplicate && "border-destructive"
+                                )}
+                              />
+                              <span className="text-sm font-medium text-muted-foreground">
+                                Line {index + 1}
+                              </span>
+                              {isDuplicate && (
+                                <Badge variant="destructive" className="gap-1 text-xs">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Duplicate
+                                </Badge>
+                              )}
+                              {item.registration && !item.vehicleId && (
+                                <span className="text-sm text-amber-500">
+                                  (Reg: {item.registration} - select vehicle)
+                                </span>
+                              )}
+                            </div>
+                            {lineItems.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => removeLineItem(item.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         
                         <div className="space-y-2">
                           <Label>Vehicle</Label>
@@ -662,7 +772,8 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                           </span>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -670,26 +781,32 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
               <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm text-muted-foreground">Invoice Total</span>
-                    <p className="text-xs text-muted-foreground">
-                      {lineItems.filter(i => i.vehicleId && i.litres && i.costPerLitre).length} vehicle(s)
-                    </p>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedCount} of {lineItems.filter(i => i.vehicleId && i.litres && i.costPerLitre).length} items selected
+                    </span>
+                    {duplicateCount > 0 && (
+                      <p className="text-xs text-destructive">
+                        {lineItems.filter(i => i.isSelected && duplicateInfo[i.id]?.isDuplicate).length} duplicates will be added
+                      </p>
+                    )}
                   </div>
-                  <span className="text-2xl font-bold text-primary">£{calculateInvoiceTotal()}</span>
+                  <span className="text-2xl font-bold text-primary">
+                    £{lineItems.filter(i => i.isSelected && i.litres && i.costPerLitre).reduce((sum, item) => sum + parseFloat(calculateLineTotal(item)), 0).toFixed(2)}
+                  </span>
                 </div>
               </div>
 
               <Button 
                 type="submit" 
                 className="w-full gradient-primary"
-                disabled={submitting}
+                disabled={submitting || selectedCount === 0}
               >
                 {submitting ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Fuel className="w-4 h-4 mr-2" />
                 )}
-                Add Fuel Invoice
+                Add {selectedCount} Fuel Record{selectedCount !== 1 ? 's' : ''}
               </Button>
             </form>
           </TabsContent>
