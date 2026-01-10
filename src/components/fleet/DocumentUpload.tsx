@@ -39,24 +39,56 @@ export function DocumentUpload({ vehicleId, onUploadComplete }: DocumentUploadPr
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const readFileAsText = (file: File): Promise<string> => {
+  const compressImage = (file: File, maxWidth: number = 1200): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        if (file.type.startsWith('image/')) {
-          // For images, read as base64
-          resolve(reader.result as string);
-        } else {
-          resolve(reader.result as string);
-        }
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Scale down if too large
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Compress to JPEG with 0.7 quality
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
       };
       reader.onerror = reject;
-      
-      if (file.type.startsWith('image/')) {
-        reader.readAsDataURL(file);
-      } else {
-        reader.readAsText(file);
-      }
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const readFileAsText = async (file: File): Promise<string> => {
+    if (file.type.startsWith('image/')) {
+      // Compress images before sending
+      return compressImage(file);
+    }
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsText(file);
     });
   };
 
