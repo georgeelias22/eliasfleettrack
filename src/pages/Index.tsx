@@ -40,9 +40,12 @@ const Index = () => {
             <h1 className="text-xl font-bold text-foreground">FleetTrack Pro</h1>
           </div>
           <div className="flex items-center gap-2">
-            <ExportReportsDropdown />
-            <AddFuelInvoiceDialog />
-            <AddVehicleDialog />
+            {/* Hide these on mobile */}
+            <div className="hidden md:flex items-center gap-2">
+              <ExportReportsDropdown />
+              <AddFuelInvoiceDialog />
+              <AddVehicleDialog />
+            </div>
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
               <Settings className="w-5 h-5" />
@@ -82,16 +85,16 @@ const Index = () => {
               <div className="flex justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
-            ) : vehicles.length === 0 ? (
+            ) : vehicles.filter(v => v.is_active !== false).length === 0 ? (
               <div className="text-center py-16 border border-dashed border-border rounded-xl">
                 <Truck className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-lg font-medium text-foreground mb-2">No vehicles yet</p>
+                <p className="text-lg font-medium text-foreground mb-2">No active vehicles</p>
                 <p className="text-muted-foreground mb-6">Add your first vehicle to start tracking</p>
                 <AddVehicleDialog />
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {vehicles.map((vehicle) => (
+                {vehicles.filter(v => v.is_active !== false).map((vehicle) => (
                   <VehicleCard
                     key={vehicle.id}
                     vehicle={vehicle}

@@ -44,6 +44,7 @@ export function AddVehicleDialog({ trigger }: AddVehicleDialogProps) {
         annual_tax: null,
         tax_paid_monthly: false,
         monthly_finance: null,
+        is_active: true,
       });
       
       toast({
