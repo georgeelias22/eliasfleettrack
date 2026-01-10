@@ -79,22 +79,43 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Compute which line items are duplicates
+  // Compute which line items are duplicates (both against DB and within the batch)
   const duplicateInfo = useMemo(() => {
-    const info: Record<string, { isDuplicate: boolean; existingRecord?: any }> = {};
+    const info: Record<string, { isDuplicate: boolean; existingRecord?: any; batchDuplicate?: boolean }> = {};
+    const seenItems: { vehicleId: string; date: string; litres: number; id: string }[] = [];
     
     lineItems.forEach(item => {
       if (item.vehicleId && item.invoiceDate && item.litres) {
+        const litresNum = parseFloat(item.litres) || 0;
+        
+        // Check against existing database records
         const existingMatch = checkFuelRecordDuplicate(
           existingFuelRecords,
           item.vehicleId,
           item.invoiceDate,
-          parseFloat(item.litres) || 0
+          litresNum
         );
+        
+        // Check for duplicates within the current batch
+        const batchMatch = seenItems.find(seen => 
+          seen.vehicleId === item.vehicleId &&
+          seen.date === item.invoiceDate &&
+          Math.abs(seen.litres - litresNum) < 0.5
+        );
+        
         info[item.id] = {
-          isDuplicate: !!existingMatch,
+          isDuplicate: !!existingMatch || !!batchMatch,
           existingRecord: existingMatch,
+          batchDuplicate: !!batchMatch,
         };
+        
+        // Add to seen items for batch duplicate detection
+        seenItems.push({
+          vehicleId: item.vehicleId,
+          date: item.invoiceDate,
+          litres: litresNum,
+          id: item.id,
+        });
       } else {
         info[item.id] = { isDuplicate: false };
       }
@@ -304,19 +325,40 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
               extractedData.lineItems.forEach(item => {
                 const fillDate = item.transactionDate || extractedData.invoiceDate || '';
                 if (item.station) lastStation = item.station;
+                const vehicleId = matchVehicleByRegistration(item.registration || '');
+                const litresNum = item.litres || 0;
                 
-                allLineItems.push({
-                  id: crypto.randomUUID(),
-                  vehicleId: matchVehicleByRegistration(item.registration || ''),
-                  registration: item.registration || '',
-                  litres: item.litres?.toString() || '',
-                  costPerLitre: item.costPerLitre?.toString() || '',
-                  mileage: item.mileage?.toString() || '',
-                  invoiceDate: fillDate,
-                  station: item.station || '',
-                  isSelected: true,
-                });
-                totalItems++;
+                // Check for duplicate within allLineItems being built
+                const isDuplicateInBatch = allLineItems.some(existing => 
+                  existing.vehicleId === vehicleId &&
+                  existing.invoiceDate === fillDate &&
+                  Math.abs(parseFloat(existing.litres) - litresNum) < 0.5
+                );
+                
+                // Check for duplicate in existing database records
+                const isDuplicateInDb = vehicleId && checkFuelRecordDuplicate(
+                  existingFuelRecords,
+                  vehicleId,
+                  fillDate,
+                  litresNum
+                );
+                
+                if (!isDuplicateInBatch) {
+                  allLineItems.push({
+                    id: crypto.randomUUID(),
+                    vehicleId,
+                    registration: item.registration || '',
+                    litres: item.litres?.toString() || '',
+                    costPerLitre: item.costPerLitre?.toString() || '',
+                    mileage: item.mileage?.toString() || '',
+                    invoiceDate: fillDate,
+                    station: item.station || '',
+                    isSelected: !isDuplicateInDb, // Auto-deselect if already in DB
+                  });
+                  totalItems++;
+                } else {
+                  console.log(`Skipping duplicate line item: ${item.registration} on ${fillDate} - ${litresNum}L`);
+                }
               });
             }
           }
@@ -726,8 +768,8 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                             <TableCell className="p-2 text-right font-medium text-xs whitespace-nowrap">
                               £{calculateLineTotal(item)}
                               {isDuplicate && (
-                                <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">
-                                  DUP
+                                <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0" title={itemDuplicateInfo?.batchDuplicate ? 'Duplicate within this batch' : 'Already exists in database'}>
+                                  {itemDuplicateInfo?.batchDuplicate ? 'BATCH' : 'DB'}
                                 </Badge>
                               )}
                             </TableCell>
