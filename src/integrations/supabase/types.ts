@@ -121,6 +121,44 @@ export type Database = {
           },
         ]
       }
+      mileage_records: {
+        Row: {
+          created_at: string
+          daily_mileage: number
+          id: string
+          odometer_reading: number | null
+          record_date: string
+          source: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_mileage: number
+          id?: string
+          odometer_reading?: number | null
+          record_date: string
+          source?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_mileage?: number
+          id?: string
+          odometer_reading?: number | null
+          record_date?: string
+          source?: string | null
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mileage_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_records: {
         Row: {
           cost: number

@@ -3,12 +3,14 @@ import { useVehicle, useUpdateVehicle, useDeleteVehicle } from '@/hooks/useVehic
 import { useServiceRecords } from '@/hooks/useServiceRecords';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useFuelRecords } from '@/hooks/useFuelRecords';
+import { useMileageRecords } from '@/hooks/useMileageRecords';
 import { useAuth } from '@/hooks/useAuth';
 import { MOTStatusBadge } from '@/components/fleet/MOTStatusBadge';
 import { DocumentUpload } from '@/components/fleet/DocumentUpload';
 import { DocumentList } from '@/components/fleet/DocumentList';
 import { CostSummary } from '@/components/fleet/CostSummary';
 import { VehicleCostCharts } from '@/components/fleet/VehicleCostCharts';
+import { FuelEfficiencyCard } from '@/components/fleet/FuelEfficiencyCard';
 import { AddFuelRecordDialog } from '@/components/fleet/AddFuelRecordDialog';
 import { FuelRecordList } from '@/components/fleet/FuelRecordList';
 import { VehicleTaxSettings } from '@/components/fleet/VehicleTaxSettings';
@@ -45,6 +47,7 @@ export default function VehicleDetail() {
   const { data: serviceRecords = [] } = useServiceRecords(id);
   const { data: documents = [] } = useDocuments(id);
   const { data: fuelRecords = [] } = useFuelRecords(id);
+  const { data: mileageRecords = [] } = useMileageRecords(id);
   const updateVehicle = useUpdateVehicle();
   const deleteVehicle = useDeleteVehicle();
 
@@ -160,6 +163,13 @@ export default function VehicleDetail() {
               </div>
               <AddFuelRecordDialog vehicleId={vehicle.id} />
             </div>
+            
+            {/* Fuel Efficiency Card */}
+            <FuelEfficiencyCard 
+              mileageRecords={mileageRecords}
+              fuelRecords={fuelRecords}
+            />
+            
             <FuelRecordList records={fuelRecords} vehicleId={vehicle.id} />
           </TabsContent>
 
