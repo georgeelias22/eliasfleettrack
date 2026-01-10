@@ -77,17 +77,27 @@ serve(async (req) => {
       ? `Known vehicle registrations in the fleet: ${vehicleRegistrations.join(', ')}`
       : '';
 
-    const systemPrompt = `You are an expert fuel invoice analyzer for fleet management.
+    const systemPrompt = `You are an expert fuel invoice analyzer for UK fleet management.
 
 Analyze the provided fuel invoice and extract detailed information about each fuel purchase line item.
 
 ${vehicleList}
 
+CRITICAL - Understand UK fuel invoice terminology:
+- LITRES: The VOLUME of fuel (typically 20-80 litres per fill-up for vans, 30-60 for cars). Look for "L", "Ltr", "Litres" columns.
+- COST PER LITRE (PPL): The PRICE per litre (typically £1.30-£1.80 in UK). Look for "PPL", "Price/L", "£/L" columns.
+- TOTAL COST: The MONEY AMOUNT paid (litres × cost per litre). Look for "Total", "Amount", "Net", "£" columns.
+
+IMPORTANT: Do NOT confuse total cost with litres! If a number is around £15-£120 it's likely the TOTAL COST, not litres.
+- If you see only total cost and cost per litre, calculate litres = total_cost / cost_per_litre
+- If you see only total cost and litres, calculate cost_per_litre = total_cost / litres
+- UK fuel prices are typically £1.30-£1.80 per litre - use this to validate your extraction
+
 For each vehicle/line item on the invoice, extract:
-- Vehicle registration number (match to known registrations if possible)
-- Litres of fuel purchased
-- Cost per litre (in GBP)
-- Total cost for that line
+- Vehicle registration number (match to known registrations if possible, UK format like AB12 CDE)
+- Litres of fuel purchased (VOLUME, typically 20-80 for a fill-up)
+- Cost per litre in GBP (PRICE, typically £1.30-£1.80)
+- Total cost for that line in GBP (MONEY PAID = litres × cost per litre)
 - Mileage (if shown)
 
 Also extract:
@@ -96,7 +106,9 @@ Also extract:
 - Overall invoice total
 
 Return all line items found on the invoice. Each line typically represents fuel purchased for a different vehicle.
-If you cannot determine a value, use null.`;
+If you cannot determine a value, use null.
+
+VALIDATION: Before returning, verify that total_cost ≈ litres × costPerLitre for each line item.`;
 
     const messages: any[] = [
       { role: "system", content: systemPrompt },
