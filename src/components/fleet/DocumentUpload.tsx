@@ -98,39 +98,49 @@ export function DocumentUpload({ vehicleId, onUploadComplete }: DocumentUploadPr
     setUploading(true);
     
     try {
-      for (const file of files) {
-        // Upload the document
-        const doc = await uploadDocument.mutateAsync({ vehicleId, file });
-        
-        toast({
-          title: 'Document uploaded',
-          description: `${file.name} has been uploaded.`,
-        });
+      // Upload all files in parallel
+      const uploadResults = await Promise.all(
+        files.map(async (file) => {
+          const doc = await uploadDocument.mutateAsync({ vehicleId, file });
+          return { doc, file };
+        })
+      );
+      
+      toast({
+        title: 'Documents uploaded',
+        description: `${uploadResults.length} file${uploadResults.length > 1 ? 's' : ''} uploaded successfully.`,
+      });
 
-        // Start AI scanning
-        setScanning(true);
-        try {
+      // Start AI scanning for all documents in parallel
+      setScanning(true);
+      
+      const scanResults = await Promise.allSettled(
+        uploadResults.map(async ({ doc, file }) => {
           const fileContent = await readFileAsText(file);
-          await scanDocument.mutateAsync({
+          return scanDocument.mutateAsync({
             documentId: doc.id,
             fileContent,
             fileName: file.name,
           });
-          
-          toast({
-            title: 'Document scanned',
-            description: 'AI has extracted cost information from your document.',
-          });
-        } catch (scanError) {
-          console.error('Scan error:', scanError);
-          toast({
-            title: 'Scan failed',
-            description: 'Could not extract data. You can add details manually.',
-            variant: 'destructive',
-          });
-        } finally {
-          setScanning(false);
-        }
+        })
+      );
+      
+      const successCount = scanResults.filter(r => r.status === 'fulfilled').length;
+      const failCount = scanResults.filter(r => r.status === 'rejected').length;
+      
+      if (successCount > 0) {
+        toast({
+          title: 'Documents scanned',
+          description: `AI extracted data from ${successCount} document${successCount > 1 ? 's' : ''}.`,
+        });
+      }
+      
+      if (failCount > 0) {
+        toast({
+          title: 'Some scans failed',
+          description: `${failCount} document${failCount > 1 ? 's' : ''} could not be scanned. You can add details manually.`,
+          variant: 'destructive',
+        });
       }
       
       setFiles([]);
@@ -138,11 +148,12 @@ export function DocumentUpload({ vehicleId, onUploadComplete }: DocumentUploadPr
     } catch (error) {
       toast({
         title: 'Upload failed',
-        description: 'Failed to upload document. Please try again.',
+        description: 'Failed to upload documents. Please try again.',
         variant: 'destructive',
       });
     } finally {
       setUploading(false);
+      setScanning(false);
     }
   };
 

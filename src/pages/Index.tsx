@@ -4,6 +4,7 @@ import { useVehicles } from '@/hooks/useVehicles';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { VehicleCard } from '@/components/fleet/VehicleCard';
 import { AddVehicleDialog } from '@/components/fleet/AddVehicleDialog';
+import { AddFuelInvoiceDialog } from '@/components/fleet/AddFuelInvoiceDialog';
 import { FleetDashboard } from '@/components/fleet/FleetDashboard';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -37,6 +38,7 @@ const Index = () => {
             <h1 className="text-xl font-bold text-foreground">FleetTrack Pro</h1>
           </div>
           <div className="flex items-center gap-3">
+            <AddFuelInvoiceDialog />
             <AddVehicleDialog />
             <Button variant="ghost" size="icon" onClick={signOut}>
               <LogOut className="w-5 h-5" />
