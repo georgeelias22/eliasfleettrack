@@ -10,6 +10,7 @@ export interface Vehicle {
   annual_tax: number | null;
   tax_paid_monthly: boolean | null;
   monthly_finance: number | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }

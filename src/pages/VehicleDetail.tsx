@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Car, Loader2, Save, Trash2, Fuel } from 'lucide-react';
+import { ArrowLeft, Car, Loader2, Save, Trash2, Fuel, Power } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
 import {
@@ -31,6 +31,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 
 export default function VehicleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -109,7 +111,12 @@ export default function VehicleDetail() {
                 <Car className="w-7 h-7 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">{vehicle.registration}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold">{vehicle.registration}</h1>
+                  {vehicle.is_active === false && (
+                    <Badge variant="secondary" className="text-muted-foreground">Inactive</Badge>
+                  )}
+                </div>
                 <p className="text-muted-foreground">{vehicle.make} {vehicle.model} {vehicle.year && `(${vehicle.year})`}</p>
               </div>
             </div>
@@ -174,6 +181,34 @@ export default function VehicleDetail() {
             </Card>
 
             <VehicleTaxSettings vehicle={vehicle} />
+
+            {/* Vehicle Status */}
+            <Card className="border-border/50 gradient-card">
+              <CardHeader><CardTitle className="flex items-center gap-2"><Power className="w-5 h-5" /> Vehicle Status</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Active Vehicle</p>
+                    <p className="text-sm text-muted-foreground">
+                      {vehicle.is_active !== false 
+                        ? 'This vehicle is included in fleet calculations and reports' 
+                        : 'This vehicle is excluded from fleet calculations but history is preserved'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={vehicle.is_active !== false}
+                    onCheckedChange={async (checked) => {
+                      try {
+                        await updateVehicle.mutateAsync({ id: vehicle.id, is_active: checked });
+                        toast({ title: checked ? 'Vehicle activated' : 'Vehicle marked as inactive' });
+                      } catch {
+                        toast({ title: 'Failed to update status', variant: 'destructive' });
+                      }
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="border-destructive/50">
               <CardHeader><CardTitle className="text-destructive">Danger Zone</CardTitle></CardHeader>

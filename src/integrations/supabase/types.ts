@@ -176,6 +176,7 @@ export type Database = {
           annual_tax: number | null
           created_at: string
           id: string
+          is_active: boolean
           make: string
           model: string
           monthly_finance: number | null
@@ -191,6 +192,7 @@ export type Database = {
           annual_tax?: number | null
           created_at?: string
           id?: string
+          is_active?: boolean
           make: string
           model: string
           monthly_finance?: number | null
@@ -206,6 +208,7 @@ export type Database = {
           annual_tax?: number | null
           created_at?: string
           id?: string
+          is_active?: boolean
           make?: string
           model?: string
           monthly_finance?: number | null

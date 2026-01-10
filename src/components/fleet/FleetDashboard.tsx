@@ -42,8 +42,8 @@ export function FleetDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Mobile Quick Actions - Prominent Upload Buttons */}
-      <div className="lg:hidden">
+      {/* Mobile Quick Actions - Prominent Upload Buttons (Mobile Only) */}
+      <div className="md:hidden">
         <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-card to-amber-500/5">
           <CardContent className="p-4">
             <div className="flex flex-col gap-4">
@@ -199,7 +199,7 @@ function FleetDashboardSkeleton() {
   return (
     <div className="space-y-6">
       {/* Mobile Quick Actions Skeleton */}
-      <div className="lg:hidden">
+      <div className="md:hidden">
         <Card className="border-border/50">
           <CardContent className="p-4">
             <Skeleton className="h-32 w-full" />
