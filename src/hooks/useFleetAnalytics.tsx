@@ -13,7 +13,7 @@ export interface FleetAnalytics {
   totalTaxCost: number;
   totalFinanceCost: number;
   costByVehicle: { vehicleId: string; registration: string; make: string; model: string; cost: number; fuelCost: number; financeCost: number }[];
-  costByMonth: { month: string; cost: number; fuelCost: number; financeCost: number }[];
+  costByMonth: { month: string; monthKey: string; cost: number; fuelCost: number; financeCost: number; taxCost: number }[];
   fuelByMonth: { month: string; monthKey: string; fuelCost: number; litres: number; avgCostPerLitre: number; fillCount: number }[];
   upcomingMOTs: { vehicle: Vehicle; daysUntil: number }[];
   overdueMOTs: Vehicle[];
@@ -115,11 +115,14 @@ export function useFleetAnalytics() {
       }).sort((a, b) => b.cost - a.cost);
 
       // Cost by month (last 12 months)
-      const costByMonth: { month: string; cost: number; fuelCost: number; financeCost: number }[] = [];
+      const costByMonth: { month: string; monthKey: string; cost: number; fuelCost: number; financeCost: number; taxCost: number }[] = [];
       const now = new Date();
       
       // Calculate monthly finance (sum of all vehicles' monthly finance)
       const totalMonthlyFinance = typedVehicles.reduce((sum, v) => sum + (v.monthly_finance || 0), 0);
+      
+      // Calculate monthly tax (annual tax / 12 for each vehicle)
+      const totalMonthlyTax = typedVehicles.reduce((sum, v) => sum + ((v.annual_tax || 0) / 12), 0);
       
       for (let i = 11; i >= 0; i--) {
         const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -140,9 +143,11 @@ export function useFleetAnalytics() {
         
         costByMonth.push({
           month: monthLabel,
-          cost: monthServiceCost + monthDocCost + monthFuelCost + totalMonthlyFinance,
-          fuelCost: monthFuelCost,
-          financeCost: totalMonthlyFinance,
+          monthKey: monthKey,
+          cost: monthServiceCost + monthDocCost + monthFuelCost + totalMonthlyFinance + totalMonthlyTax,
+          fuelCost: Math.round(monthFuelCost * 100) / 100,
+          financeCost: Math.round(totalMonthlyFinance * 100) / 100,
+          taxCost: Math.round(totalMonthlyTax * 100) / 100,
         });
       }
 

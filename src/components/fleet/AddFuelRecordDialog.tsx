@@ -15,10 +15,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Fuel, Plus, Loader2 } from 'lucide-react';
 
 interface AddFuelRecordDialogProps {
-  vehicleId: string;
+  vehicleId?: string;
+  trigger?: React.ReactNode;
 }
 
-export function AddFuelRecordDialog({ vehicleId }: AddFuelRecordDialogProps) {
+export function AddFuelRecordDialog({ vehicleId, trigger }: AddFuelRecordDialogProps) {
   const [open, setOpen] = useState(false);
   const [fillDate, setFillDate] = useState(new Date().toISOString().split('T')[0]);
   const [litres, setLitres] = useState('');
@@ -82,10 +83,12 @@ export function AddFuelRecordDialog({ vehicleId }: AddFuelRecordDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gradient-primary">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Fuel
-        </Button>
+        {trigger || (
+          <Button className="gradient-primary">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Fuel
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="bg-card border-border">
         <DialogHeader>
