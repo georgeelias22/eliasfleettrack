@@ -40,7 +40,14 @@ serve(async (req) => {
 
     const { fileContent, fileName, vehicleRegistrations } = await req.json();
     
+    console.log("========== FUEL INVOICE SCAN START ==========");
+    console.log("📄 File name:", fileName);
+    console.log("📋 Known registrations:", vehicleRegistrations);
+    console.log("📏 Content length:", fileContent?.length || 0, "chars");
+    console.log("🖼️ Is image:", fileContent?.startsWith('data:image/') ? "YES" : "NO");
+    
     if (!fileContent) {
+      console.log("❌ ERROR: No file content provided");
       return new Response(
         JSON.stringify({ error: "File content is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -203,10 +210,14 @@ VALIDATION: Before returning, verify that total_cost ≈ litres × costPerLitre 
 
     const data = await response.json();
     
+    console.log("========== AI RESPONSE RECEIVED ==========");
+    console.log("🤖 Full AI response:", JSON.stringify(data, null, 2));
+    
     let extractedData = null;
     const toolCalls = data.choices?.[0]?.message?.tool_calls;
     if (toolCalls && toolCalls.length > 0) {
       const functionArgs = toolCalls[0].function?.arguments;
+      console.log("🔧 Tool call arguments (raw):", functionArgs);
       if (functionArgs) {
         extractedData = JSON.parse(functionArgs);
       }
@@ -214,6 +225,7 @@ VALIDATION: Before returning, verify that total_cost ≈ litres × costPerLitre 
 
     if (!extractedData) {
       const content = data.choices?.[0]?.message?.content;
+      console.log("📝 Message content (fallback):", content);
       if (content) {
         try {
           extractedData = JSON.parse(content);
@@ -222,6 +234,41 @@ VALIDATION: Before returning, verify that total_cost ≈ litres × costPerLitre 
         }
       }
     }
+
+    console.log("========== EXTRACTED DATA ==========");
+    console.log("📊 Invoice Date:", extractedData?.invoiceDate);
+    console.log("⛽ Station:", extractedData?.station);
+    console.log("💰 Invoice Total:", extractedData?.invoiceTotal);
+    console.log("📋 Number of line items:", extractedData?.lineItems?.length || 0);
+    
+    if (extractedData?.lineItems) {
+      extractedData.lineItems.forEach((item: any, index: number) => {
+        console.log(`\n--- Line Item ${index + 1} ---`);
+        console.log(`  🚗 Registration: ${item.registration}`);
+        console.log(`  ⛽ Litres: ${item.litres}`);
+        console.log(`  💷 Cost per litre: £${item.costPerLitre}`);
+        console.log(`  💰 Total cost: £${item.totalCost}`);
+        console.log(`  📏 Mileage: ${item.mileage || 'N/A'}`);
+        
+        // Validation check
+        if (item.litres && item.costPerLitre && item.totalCost) {
+          const calculated = item.litres * item.costPerLitre;
+          const diff = Math.abs(calculated - item.totalCost);
+          const valid = diff < 1; // Allow £1 tolerance
+          console.log(`  ✅ Validation: ${item.litres} × £${item.costPerLitre} = £${calculated.toFixed(2)} (${valid ? 'VALID' : '⚠️ MISMATCH - diff: £' + diff.toFixed(2)})`);
+        }
+        
+        // Range checks
+        if (item.costPerLitre < 1.20 || item.costPerLitre > 2.00) {
+          console.log(`  ⚠️ WARNING: Cost per litre £${item.costPerLitre} is outside typical UK range (£1.20-£2.00)`);
+        }
+        if (item.litres > 100) {
+          console.log(`  ⚠️ WARNING: Litres ${item.litres} seems high for a single fill-up`);
+        }
+      });
+    }
+    
+    console.log("\n========== FUEL INVOICE SCAN END ==========");
 
     return new Response(
       JSON.stringify({ success: true, data: extractedData }),
