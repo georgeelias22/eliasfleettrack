@@ -4,14 +4,10 @@ import { useVehicles } from '@/hooks/useVehicles';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  Car, 
   PoundSterling, 
-  AlertTriangle, 
-  Clock, 
   TrendingUp,
   Calendar,
   Fuel,
-  Droplets,
   Receipt,
   BarChart3
 } from 'lucide-react';
@@ -40,61 +36,9 @@ export function FleetDashboard() {
     );
   }
 
-  const statCards = [
-    {
-      label: 'Total Vehicles',
-      value: analytics.totalVehicles,
-      icon: Car,
-      className: 'text-primary',
-      bgClass: 'bg-primary/10',
-    },
-    {
-      label: 'Total Fleet Cost',
-      value: `£${analytics.totalCost.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      icon: PoundSterling,
-      className: 'text-accent',
-      bgClass: 'bg-accent/10',
-    },
-    {
-      label: 'Fuel Costs',
-      value: `£${analytics.totalFuelCost.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      icon: Fuel,
-      className: 'text-amber-500',
-      bgClass: 'bg-amber-500/10',
-    },
-    {
-      label: 'Total Litres',
-      value: `${analytics.totalLitres.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}L`,
-      icon: Droplets,
-      className: 'text-sky-500',
-      bgClass: 'bg-sky-500/10',
-    },
-    {
-      label: 'Avg £/Litre',
-      value: `£${analytics.avgCostPerLitre.toFixed(3)}`,
-      icon: TrendingUp,
-      className: 'text-violet-500',
-      bgClass: 'bg-violet-500/10',
-    },
-    {
-      label: 'Finance Costs',
-      value: `£${analytics.totalFinanceCost.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      icon: PoundSterling,
-      className: 'text-emerald-500',
-      bgClass: 'bg-emerald-500/10',
-    },
-    {
-      label: 'MOT Due Soon',
-      value: analytics.motStats.dueSoon + analytics.motStats.overdue,
-      icon: analytics.motStats.overdue > 0 ? AlertTriangle : Clock,
-      className: analytics.motStats.overdue > 0 ? 'text-status-danger' : 'text-status-warning',
-      bgClass: analytics.motStats.overdue > 0 ? 'bg-status-danger/10' : 'bg-status-warning/10',
-    },
-  ];
-
   return (
     <div className="space-y-6">
-      {/* 12 Month Summary */}
+      {/* 12 Month Summary - All Key Stats */}
       <div>
         <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
           <Calendar className="w-5 h-5 text-primary" />
@@ -107,31 +51,13 @@ export function FleetDashboard() {
           financeCost={analytics.totalFinanceCost}
           taxCost={analytics.totalTaxCost}
           vehicleCount={analytics.totalVehicles}
+          totalLitres={analytics.totalLitres}
+          avgCostPerLitre={analytics.avgCostPerLitre}
+          motDueSoon={analytics.motStats.dueSoon}
+          motOverdue={analytics.motStats.overdue}
         />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {statCards.map((stat) => (
-          <Card key={stat.label} className="border-border/50 bg-card overflow-hidden">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    {stat.label}
-                  </p>
-                  <p className="text-xl font-bold text-foreground mt-2">{stat.value}</p>
-                </div>
-                <div className={`p-2 rounded-lg ${stat.bgClass}`}>
-                  <stat.icon className={`w-4 h-4 ${stat.className}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Fuel Charts Row */}
 
       {/* Fuel Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
