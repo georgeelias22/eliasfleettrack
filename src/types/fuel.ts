@@ -8,5 +8,6 @@ export interface FuelRecord {
   mileage: number | null;
   station: string | null;
   notes: string | null;
+  invoice_file_path: string | null;
   created_at: string;
 }

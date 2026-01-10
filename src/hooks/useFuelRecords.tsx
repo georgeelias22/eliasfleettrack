@@ -38,11 +38,23 @@ export function useAllFuelRecords() {
   });
 }
 
+interface CreateFuelRecordInput {
+  vehicle_id: string;
+  fill_date: string;
+  litres: number;
+  cost_per_litre: number;
+  total_cost: number;
+  mileage?: number | null;
+  station?: string | null;
+  notes?: string | null;
+  invoice_file_path?: string | null;
+}
+
 export function useCreateFuelRecord() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (record: Omit<FuelRecord, 'id' | 'created_at'>) => {
+    mutationFn: async (record: CreateFuelRecordInput) => {
       const { data, error } = await supabase
         .from('fuel_records')
         .insert(record)

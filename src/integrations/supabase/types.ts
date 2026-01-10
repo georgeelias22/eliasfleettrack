@@ -77,6 +77,7 @@ export type Database = {
           created_at: string
           fill_date: string
           id: string
+          invoice_file_path: string | null
           litres: number
           mileage: number | null
           notes: string | null
@@ -89,6 +90,7 @@ export type Database = {
           created_at?: string
           fill_date: string
           id?: string
+          invoice_file_path?: string | null
           litres: number
           mileage?: number | null
           notes?: string | null
@@ -101,6 +103,7 @@ export type Database = {
           created_at?: string
           fill_date?: string
           id?: string
+          invoice_file_path?: string | null
           litres?: number
           mileage?: number | null
           notes?: string | null
