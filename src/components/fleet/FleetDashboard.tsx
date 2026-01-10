@@ -12,12 +12,14 @@ import {
   Calendar,
   Fuel,
   Droplets,
-  Receipt
+  Receipt,
+  BarChart3
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
 import { UpcomingMOTList } from './UpcomingMOTList';
 import { CostByVehicleChart } from './CostByVehicleChart';
 import { FuelTrendChart } from './FuelTrendChart';
+import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
 
 export function FleetDashboard() {
@@ -112,18 +114,34 @@ export function FleetDashboard() {
         ))}
       </div>
 
-      {/* Fuel Trend Chart - Full Width */}
-      <Card className="border-border/50 gradient-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Fuel className="w-4 h-4 text-amber-500" />
-            Fuel Spending (Last 12 Months)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FuelTrendChart data={analytics.fuelByMonth} />
-        </CardContent>
-      </Card>
+      {/* Fuel Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Fuel Trend Chart */}
+        <Card className="border-border/50 gradient-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Fuel className="w-4 h-4 text-amber-500" />
+              Fuel Spending (Last 12 Months)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FuelTrendChart data={analytics.fuelByMonth} />
+          </CardContent>
+        </Card>
+
+        {/* Fuel Cost by Vehicle Chart */}
+        <Card className="border-border/50 gradient-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <BarChart3 className="w-4 h-4 text-sky-500" />
+              Fuel Cost by Vehicle (Last 12 Months)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FuelCostByVehicleChart fuelRecords={fuelRecords} vehicles={vehicles} />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
