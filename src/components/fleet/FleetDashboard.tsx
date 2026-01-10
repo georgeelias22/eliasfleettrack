@@ -52,6 +52,13 @@ export function FleetDashboard() {
       bgClass: 'bg-amber-500/10',
     },
     {
+      label: 'Finance Costs',
+      value: `£${analytics.totalFinanceCost.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      icon: PoundSterling,
+      className: 'text-emerald-500',
+      bgClass: 'bg-emerald-500/10',
+    },
+    {
       label: 'MOT Due Soon',
       value: analytics.motStats.dueSoon + analytics.motStats.overdue,
       icon: analytics.motStats.overdue > 0 ? AlertTriangle : Clock,
@@ -63,7 +70,7 @@ export function FleetDashboard() {
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {statCards.map((stat) => (
           <Card key={stat.label} className="border-border/50 gradient-card overflow-hidden">
             <CardContent className="p-4">
