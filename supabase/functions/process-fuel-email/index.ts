@@ -136,7 +136,7 @@ Return structured JSON data.`;
           { role: "user", content: `Extract fuel data from this invoice:\n\nFile: ${fileName}\n\nContent:\n${fileContent}` },
         ];
 
-    const aiResponse = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${lovableApiKey}`,
