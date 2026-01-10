@@ -7,10 +7,13 @@ export interface FleetAnalytics {
   totalVehicles: number;
   totalCost: number;
   totalFuelCost: number;
+  totalLitres: number;
+  avgCostPerLitre: number;
   totalTaxCost: number;
   totalFinanceCost: number;
   costByVehicle: { vehicleId: string; registration: string; make: string; model: string; cost: number; fuelCost: number; financeCost: number }[];
   costByMonth: { month: string; cost: number; fuelCost: number; financeCost: number }[];
+  fuelByMonth: { month: string; fuelCost: number; litres: number; avgCostPerLitre: number; fillCount: number }[];
   upcomingMOTs: { vehicle: Vehicle; daysUntil: number }[];
   overdueMOTs: Vehicle[];
   motStats: { valid: number; dueSoon: number; overdue: number; unknown: number };
@@ -63,8 +66,10 @@ export function useFleetAnalytics() {
       // Calculate total costs from documents (AI extracted)
       const documentCosts = typedDocs.reduce((sum, doc) => sum + (doc.extracted_cost || 0), 0);
       
-      // Calculate total fuel costs
+      // Calculate total fuel costs and litres
       const totalFuelCost = typedFuel.reduce((sum, record) => sum + record.total_cost, 0);
+      const totalLitres = typedFuel.reduce((sum, record) => sum + record.litres, 0);
+      const avgCostPerLitre = totalLitres > 0 ? totalFuelCost / totalLitres : 0;
 
       // Calculate total tax costs (annual)
       const totalTaxCost = typedVehicles.reduce((sum, v) => sum + (v.annual_tax || 0), 0);
@@ -132,6 +137,28 @@ export function useFleetAnalytics() {
         });
       }
 
+      // Fuel by month (last 12 months) - detailed fuel analytics
+      const fuelByMonth: { month: string; fuelCost: number; litres: number; avgCostPerLitre: number; fillCount: number }[] = [];
+      
+      for (let i = 11; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = monthDate.toISOString().slice(0, 7);
+        const monthLabel = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        
+        const monthFuelRecords = typedFuel.filter(f => f.fill_date.startsWith(monthKey));
+        const monthFuelCost = monthFuelRecords.reduce((sum, f) => sum + f.total_cost, 0);
+        const monthLitres = monthFuelRecords.reduce((sum, f) => sum + f.litres, 0);
+        const monthAvgCostPerLitre = monthLitres > 0 ? monthFuelCost / monthLitres : 0;
+        
+        fuelByMonth.push({
+          month: monthLabel,
+          fuelCost: monthFuelCost,
+          litres: monthLitres,
+          avgCostPerLitre: monthAvgCostPerLitre,
+          fillCount: monthFuelRecords.length,
+        });
+      }
+
       // MOT analysis
       const motStats = { valid: 0, dueSoon: 0, overdue: 0, unknown: 0 };
       const upcomingMOTs: { vehicle: Vehicle; daysUntil: number }[] = [];
@@ -171,10 +198,13 @@ export function useFleetAnalytics() {
         totalVehicles: typedVehicles.length,
         totalCost,
         totalFuelCost,
+        totalLitres,
+        avgCostPerLitre,
         totalTaxCost,
         totalFinanceCost,
         costByVehicle,
         costByMonth,
+        fuelByMonth,
         upcomingMOTs,
         overdueMOTs,
         motStats,

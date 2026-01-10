@@ -6,13 +6,15 @@ import {
   PoundSterling, 
   AlertTriangle, 
   Clock, 
-  CheckCircle,
   TrendingUp,
-  Calendar
+  Calendar,
+  Fuel,
+  Droplets
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
 import { UpcomingMOTList } from './UpcomingMOTList';
 import { CostByVehicleChart } from './CostByVehicleChart';
+import { FuelTrendChart } from './FuelTrendChart';
 
 export function FleetDashboard() {
   const { data: analytics, isLoading, error } = useFleetAnalytics();
@@ -47,9 +49,23 @@ export function FleetDashboard() {
     {
       label: 'Fuel Costs',
       value: `£${analytics.totalFuelCost.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      icon: TrendingUp,
+      icon: Fuel,
       className: 'text-amber-500',
       bgClass: 'bg-amber-500/10',
+    },
+    {
+      label: 'Total Litres',
+      value: `${analytics.totalLitres.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}L`,
+      icon: Droplets,
+      className: 'text-sky-500',
+      bgClass: 'bg-sky-500/10',
+    },
+    {
+      label: 'Avg £/Litre',
+      value: `£${analytics.avgCostPerLitre.toFixed(3)}`,
+      icon: TrendingUp,
+      className: 'text-violet-500',
+      bgClass: 'bg-violet-500/10',
     },
     {
       label: 'Finance Costs',
@@ -70,7 +86,7 @@ export function FleetDashboard() {
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {statCards.map((stat) => (
           <Card key={stat.label} className="border-border/50 gradient-card overflow-hidden">
             <CardContent className="p-4">
@@ -79,16 +95,29 @@ export function FleetDashboard() {
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {stat.label}
                   </p>
-                  <p className="text-2xl font-bold text-foreground mt-2">{stat.value}</p>
+                  <p className="text-xl font-bold text-foreground mt-2">{stat.value}</p>
                 </div>
                 <div className={`p-2 rounded-lg ${stat.bgClass}`}>
-                  <stat.icon className={`w-5 h-5 ${stat.className}`} />
+                  <stat.icon className={`w-4 h-4 ${stat.className}`} />
                 </div>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Fuel Trend Chart - Full Width */}
+      <Card className="border-border/50 gradient-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Fuel className="w-4 h-4 text-amber-500" />
+            Fuel Spending (Last 12 Months)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FuelTrendChart data={analytics.fuelByMonth} />
+        </CardContent>
+      </Card>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -97,7 +126,7 @@ export function FleetDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <TrendingUp className="w-4 h-4 text-primary" />
-              Cost Trends (Last 12 Months)
+              Total Cost Trends (Last 12 Months)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -141,8 +170,8 @@ export function FleetDashboard() {
 function FleetDashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {[...Array(5)].map((_, i) => (
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        {[...Array(7)].map((_, i) => (
           <Card key={i} className="border-border/50">
             <CardContent className="p-4">
               <Skeleton className="h-4 w-20 mb-2" />
@@ -151,6 +180,11 @@ function FleetDashboardSkeleton() {
           </Card>
         ))}
       </div>
+      <Card className="border-border/50">
+        <CardContent className="p-6">
+          <Skeleton className="h-[250px] w-full" />
+        </CardContent>
+      </Card>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border-border/50">
           <CardContent className="p-6">
