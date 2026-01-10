@@ -126,22 +126,21 @@ export function FleetDashboard() {
         </Card>
       </div>
 
-      {/* Charts Row - Hidden on Mobile */}
-      <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Cost Trend Chart */}
-        <Card className="border-border/50 bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              Total Cost Trends
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CostTrendChart data={analytics.costByMonth} />
-          </CardContent>
-        </Card>
+      {/* Cost Trend Chart - Visible on all devices */}
+      <Card className="border-border/50 bg-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            Monthly Cost Trends
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CostTrendChart data={analytics.costByMonth} />
+        </CardContent>
+      </Card>
 
-        {/* Cost by Vehicle Chart */}
+      {/* Cost by Vehicle Chart - Hidden on Mobile */}
+      <div className="hidden md:block">
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
