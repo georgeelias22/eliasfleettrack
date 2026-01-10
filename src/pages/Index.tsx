@@ -4,9 +4,10 @@ import { useVehicles } from '@/hooks/useVehicles';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { VehicleCard } from '@/components/fleet/VehicleCard';
 import { AddVehicleDialog } from '@/components/fleet/AddVehicleDialog';
-import { FleetStats } from '@/components/fleet/FleetStats';
+import { FleetDashboard } from '@/components/fleet/FleetDashboard';
 import { Button } from '@/components/ui/button';
-import { Truck, LogOut, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Truck, LogOut, Loader2, LayoutDashboard, Car } from 'lucide-react';
 
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -45,39 +46,53 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-foreground mb-2">Fleet Overview</h2>
-          <p className="text-muted-foreground">Track MOT dates, service history, and costs</p>
-        </div>
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-1">Fleet Overview</h2>
+              <p className="text-muted-foreground">Track MOT dates, service history, and costs</p>
+            </div>
+            <TabsList className="bg-muted/50">
+              <TabsTrigger value="dashboard" className="gap-2">
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="vehicles" className="gap-2">
+                <Car className="w-4 h-4" />
+                Vehicles
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-        <FleetStats vehicles={vehicles} />
+          <TabsContent value="dashboard" className="mt-6">
+            <FleetDashboard />
+          </TabsContent>
 
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Your Vehicles</h3>
-          
-          {vehiclesLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : vehicles.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-border rounded-xl">
-              <Truck className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
-              <p className="text-lg font-medium text-foreground mb-2">No vehicles yet</p>
-              <p className="text-muted-foreground mb-6">Add your first vehicle to start tracking</p>
-              <AddVehicleDialog />
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {vehicles.map((vehicle) => (
-                <VehicleCard
-                  key={vehicle.id}
-                  vehicle={vehicle}
-                  onClick={() => navigate(`/vehicle/${vehicle.id}`)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+          <TabsContent value="vehicles" className="mt-6">
+            {vehiclesLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : vehicles.length === 0 ? (
+              <div className="text-center py-16 border border-dashed border-border rounded-xl">
+                <Truck className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
+                <p className="text-lg font-medium text-foreground mb-2">No vehicles yet</p>
+                <p className="text-muted-foreground mb-6">Add your first vehicle to start tracking</p>
+                <AddVehicleDialog />
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {vehicles.map((vehicle) => (
+                  <VehicleCard
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                    onClick={() => navigate(`/vehicle/${vehicle.id}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
