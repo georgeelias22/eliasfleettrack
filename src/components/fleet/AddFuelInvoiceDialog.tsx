@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface FuelLineItem {
   id: string;
@@ -656,83 +657,80 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                   </div>
                 </div>
                 
-                <div className="max-h-[300px] overflow-y-auto overscroll-contain touch-pan-y border rounded-lg">
-                  <table className="w-full text-sm">
-                    <thead className="bg-secondary/50 sticky top-0">
-                      <tr className="border-b">
-                        <th className="p-2 text-left w-8">
+                <div className="max-h-[400px] overflow-y-auto overscroll-contain touch-pan-y border rounded-lg">
+                  <Table>
+                    <TableHeader className="bg-secondary/50 sticky top-0 z-10">
+                      <TableRow>
+                        <TableHead className="w-8 p-2">
                           <Checkbox
-                            checked={selectedCount === lineItems.length}
+                            checked={lineItems.length > 0 && selectedCount === lineItems.length}
                             onCheckedChange={(checked) => checked ? selectAll() : deselectAll()}
                           />
-                        </th>
-                        <th className="p-2 text-left">Vehicle</th>
-                        <th className="p-2 text-left">Date</th>
-                        <th className="p-2 text-right">Litres</th>
-                        <th className="p-2 text-right">£/L</th>
-                        <th className="p-2 text-right">Total</th>
-                        <th className="p-2 w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lineItems.map((item, index) => {
+                        </TableHead>
+                        <TableHead className="p-2">Vehicle</TableHead>
+                        <TableHead className="p-2">Date</TableHead>
+                        <TableHead className="p-2 text-right">Litres</TableHead>
+                        <TableHead className="p-2 text-right">£/L</TableHead>
+                        <TableHead className="p-2 text-right">Total</TableHead>
+                        <TableHead className="w-8 p-2"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lineItems.map((item) => {
                         const itemDuplicateInfo = duplicateInfo[item.id];
                         const isDuplicate = itemDuplicateInfo?.isDuplicate;
                         const vehicle = vehicles.find(v => v.id === item.vehicleId);
+                        const displayReg = vehicle?.registration || item.registration || '—';
                         
                         return (
-                          <tr 
+                          <TableRow 
                             key={item.id} 
                             className={cn(
-                              "border-b last:border-b-0 transition-colors",
                               isDuplicate 
                                 ? "bg-destructive/10" 
                                 : item.isSelected 
                                   ? "bg-primary/5"
-                                  : "hover:bg-secondary/30"
+                                  : ""
                             )}
                           >
-                            <td className="p-2">
+                            <TableCell className="p-2">
                               <Checkbox
                                 checked={item.isSelected}
                                 onCheckedChange={() => toggleItemSelection(item.id)}
                               />
-                            </td>
-                            <td className="p-2">
-                              <Select
+                            </TableCell>
+                            <TableCell className="p-2">
+                              <select
                                 value={item.vehicleId}
-                                onValueChange={(value) => updateLineItem(item.id, 'vehicleId', value)}
+                                onChange={(e) => updateLineItem(item.id, 'vehicleId', e.target.value)}
+                                className="text-xs bg-transparent border-0 p-0 focus:ring-0 cursor-pointer max-w-[100px] truncate"
                               >
-                                <SelectTrigger className="h-8 text-xs bg-transparent border-0 p-0 shadow-none">
-                                  <SelectValue placeholder={item.registration || "Select"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {vehicles.map((v) => (
-                                    <SelectItem key={v.id} value={v.id}>
-                                      {v.registration}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </td>
-                            <td className="p-2 text-xs text-muted-foreground">
-                              {item.invoiceDate || invoiceDate}
-                            </td>
-                            <td className="p-2 text-right font-mono text-xs">
+                                <option value="">{item.registration || 'Select'}</option>
+                                {vehicles.map((v) => (
+                                  <option key={v.id} value={v.id}>
+                                    {v.registration}
+                                  </option>
+                                ))}
+                              </select>
+                            </TableCell>
+                            <TableCell className="p-2 text-xs text-muted-foreground whitespace-nowrap">
+                              {item.invoiceDate || '—'}
+                            </TableCell>
+                            <TableCell className="p-2 text-right font-mono text-xs">
                               {parseFloat(item.litres || '0').toFixed(2)}
-                            </td>
-                            <td className="p-2 text-right font-mono text-xs">
+                            </TableCell>
+                            <TableCell className="p-2 text-right font-mono text-xs">
                               £{parseFloat(item.costPerLitre || '0').toFixed(3)}
-                            </td>
-                            <td className="p-2 text-right font-medium text-xs">
+                            </TableCell>
+                            <TableCell className="p-2 text-right font-medium text-xs whitespace-nowrap">
                               £{calculateLineTotal(item)}
                               {isDuplicate && (
                                 <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">
                                   DUP
                                 </Badge>
                               )}
-                            </td>
-                            <td className="p-2">
+                            </TableCell>
+                            <TableCell className="p-2">
                               {lineItems.length > 1 && (
                                 <Button
                                   type="button"
@@ -744,12 +742,12 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                                   <X className="w-3 h-3" />
                                 </Button>
                               )}
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         );
                       })}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
 
