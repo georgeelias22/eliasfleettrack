@@ -6,7 +6,84 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MAX_CONTENT_LENGTH = 500000;
+const MAX_CONTENT_LENGTH = 150000;
+
+function parseExpectedInvoiceDate(fileName?: string): string | null {
+  if (!fileName) return null;
+
+  // Common patterns: 29_06_2025, 29-06-2025, 29.06.2025
+  const match = fileName.match(/(\d{2})[_.-](\d{2})[_.-](\d{4})/g);
+  if (!match || match.length === 0) return null;
+
+  // Use the last date-like occurrence (often at end of filename)
+  const last = match[match.length - 1];
+  const parts = last.match(/(\d{2})[_.-](\d{2})[_.-](\d{4})/);
+  if (!parts) return null;
+
+  const [, dd, mm, yyyy] = parts;
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function toDate(value?: string): Date | null {
+  if (!value) return null;
+  const m = value.match(/^\d{4}-\d{2}-\d{2}$/);
+  if (!m) return null;
+  const d = new Date(value + 'T00:00:00Z');
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function extractRelevantText(raw: string, vehicleRegistrations: string[] = []): string {
+  // Many PDFs include lots of surrounding boilerplate and even other invoice pages.
+  // Keep only lines likely to belong to the "Transaction Detail" table and totals.
+  const keywords = [
+    'transaction',
+    'transaction detail',
+    'quantity',
+    'ppl',
+    'net amount',
+    'gross',
+    'vat',
+    'invoice',
+    'total',
+    'date',
+    'site',
+    'station',
+  ];
+
+  const regs = vehicleRegistrations
+    .map((r) => r?.trim())
+    .filter(Boolean)
+    .map((r) => r!.toUpperCase());
+
+  const lines = raw.split(/\r?\n/);
+  const keep = new Set<number>();
+
+  const matchesLine = (line: string) => {
+    const l = line.toLowerCase();
+    if (keywords.some((k) => l.includes(k))) return true;
+    const upper = line.toUpperCase();
+    if (regs.some((r) => r.length >= 5 && upper.includes(r))) return true;
+    // UK date fragments in DD/MM/YYYY form (common in the table)
+    if (/\b\d{2}\/\d{2}\/\d{4}\b/.test(line)) return true;
+    // Money fragments
+    if (/£\s?\d/.test(line)) return true;
+    return false;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    if (!matchesLine(lines[i])) continue;
+    for (let j = Math.max(0, i - 2); j <= Math.min(lines.length - 1, i + 2); j++) {
+      keep.add(j);
+    }
+  }
+
+  const kept = Array.from(keep)
+    .sort((a, b) => a - b)
+    .map((i) => lines[i])
+    .join('\n');
+
+  return kept || raw;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -39,13 +116,16 @@ serve(async (req) => {
     }
 
     const { fileContent, fileName, vehicleRegistrations } = await req.json();
-    
+
+    const expectedInvoiceDate = parseExpectedInvoiceDate(fileName) || null;
+
     console.log("========== FUEL INVOICE SCAN START ==========");
     console.log("📄 File name:", fileName);
+    console.log("🧭 Expected invoice date (from filename):", expectedInvoiceDate || 'N/A');
     console.log("📋 Known registrations:", vehicleRegistrations);
     console.log("📏 Content length:", fileContent?.length || 0, "chars");
     console.log("🖼️ Is image:", fileContent?.startsWith('data:image/') ? "YES" : "NO");
-    
+
     if (!fileContent) {
       console.log("❌ ERROR: No file content provided");
       return new Response(
@@ -61,22 +141,26 @@ serve(async (req) => {
 
     let processedContent = fileContent;
     let isImage = false;
-    
+
     if (fileContent.startsWith('data:image/')) {
       isImage = true;
       if (fileContent.length > MAX_CONTENT_LENGTH * 2) {
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             error: "Image file is too large for AI processing. Please upload a smaller image (under 5MB) or use a PDF/text document instead.",
-            userMessage: true 
+            userMessage: true
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     } else {
-      if (fileContent.length > MAX_CONTENT_LENGTH) {
-        processedContent = fileContent.substring(0, MAX_CONTENT_LENGTH) + "\n\n[Content truncated due to length...]";
-        console.log(`Content truncated from ${fileContent.length} to ${MAX_CONTENT_LENGTH} characters`);
+      // Reduce noise aggressively to prevent the model from picking up unrelated invoice pages/months.
+      processedContent = extractRelevantText(fileContent, vehicleRegistrations);
+
+      const originalLen = processedContent.length;
+      if (processedContent.length > MAX_CONTENT_LENGTH) {
+        processedContent = processedContent.substring(0, MAX_CONTENT_LENGTH) + "\n\n[Content truncated due to length...]";
+        console.log(`Content truncated from ${originalLen} to ${MAX_CONTENT_LENGTH} characters`);
       }
     }
 
@@ -87,6 +171,9 @@ serve(async (req) => {
     const systemPrompt = `You are an expert fuel invoice analyzer for UK fleet management.
 
 Analyze the provided fuel invoice and extract detailed information about each fuel purchase line item.
+
+${expectedInvoiceDate ? `Expected invoice date (from filename): ${expectedInvoiceDate}.` : ''}
+${expectedInvoiceDate ? 'CRITICAL: Ignore any transactions that clearly belong to other invoice periods/months. All extracted transaction dates should be near this invoice date.' : ''}
 
 ${vehicleList}
 
@@ -247,11 +334,19 @@ IMPORTANT: Always return costs INCLUDING VAT (multiply net by 1.2)!`;
     console.log("📊 Invoice Date:", extractedData?.invoiceDate);
     console.log("💰 Invoice Total:", extractedData?.invoiceTotal);
     console.log("📋 Number of line items:", extractedData?.lineItems?.length || 0);
-    
+
+    // Anchor date for sanity checks (prefer filename-derived date)
+    const anchorInvoiceDate = toDate(expectedInvoiceDate || extractedData?.invoiceDate);
+    if (expectedInvoiceDate && extractedData?.invoiceDate && expectedInvoiceDate !== extractedData.invoiceDate) {
+      console.log(
+        `⚠️ Invoice date mismatch: filename=${expectedInvoiceDate} vs AI=${extractedData.invoiceDate}. Will use filename date for validation.`
+      );
+    }
+
     // Validate and filter line items - reject invalid ones
     const validatedLineItems: any[] = [];
     const rejectedLineItems: any[] = [];
-    
+
     if (extractedData?.lineItems) {
       extractedData.lineItems.forEach((item: any, index: number) => {
         console.log(`\n--- Line Item ${index + 1} ---`);
@@ -307,14 +402,35 @@ IMPORTANT: Always return costs INCLUDING VAT (multiply net by 1.2)!`;
           if (!dateMatch) {
             issues.push(`Invalid date format: ${item.transactionDate}`);
           } else {
-            const txDate = new Date(item.transactionDate);
+            const txDate = toDate(item.transactionDate);
             const now = new Date();
             const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
-            if (txDate > now) {
-              issues.push(`Future date: ${item.transactionDate}`);
-            }
-            if (txDate < twoYearsAgo) {
-              issues.push(`Date too old: ${item.transactionDate}`);
+
+            if (!txDate) {
+              issues.push(`Invalid date: ${item.transactionDate}`);
+            } else {
+              if (txDate > now) {
+                issues.push(`Future date: ${item.transactionDate}`);
+              }
+              if (txDate < twoYearsAgo) {
+                issues.push(`Date too old: ${item.transactionDate}`);
+              }
+
+              // Sanity: transaction dates must be close to the invoice date we are scanning.
+              // Fuel-card invoices typically cover a short period (days/weeks). If we see dates months away,
+              // it's almost always context-bleed or hallucination.
+              if (anchorInvoiceDate) {
+                const min = new Date(anchorInvoiceDate);
+                min.setUTCDate(min.getUTCDate() - 60);
+                const max = new Date(anchorInvoiceDate);
+                max.setUTCDate(max.getUTCDate() + 7);
+
+                if (txDate < min || txDate > max) {
+                  issues.push(
+                    `Transaction date ${item.transactionDate} is outside expected window around invoice date ${anchorInvoiceDate.toISOString().slice(0, 10)}`
+                  );
+                }
+              }
             }
           }
         }
