@@ -8,6 +8,7 @@ import { MOTStatusBadge } from '@/components/fleet/MOTStatusBadge';
 import { DocumentUpload } from '@/components/fleet/DocumentUpload';
 import { DocumentList } from '@/components/fleet/DocumentList';
 import { CostSummary } from '@/components/fleet/CostSummary';
+import { VehicleCostCharts } from '@/components/fleet/VehicleCostCharts';
 import { AddFuelRecordDialog } from '@/components/fleet/AddFuelRecordDialog';
 import { FuelRecordList } from '@/components/fleet/FuelRecordList';
 import { VehicleTaxSettings } from '@/components/fleet/VehicleTaxSettings';
@@ -162,7 +163,14 @@ export default function VehicleDetail() {
             <FuelRecordList records={fuelRecords} vehicleId={vehicle.id} />
           </TabsContent>
 
-          <TabsContent value="costs">
+          <TabsContent value="costs" className="space-y-6">
+            <VehicleCostCharts 
+              fuelRecords={fuelRecords}
+              serviceRecords={serviceRecords}
+              documents={documents}
+              annualTax={vehicle.annual_tax || 0}
+              monthlyFinance={vehicle.monthly_finance || 0}
+            />
             <CostSummary documents={documents} serviceRecords={serviceRecords} fuelRecords={fuelRecords} />
           </TabsContent>
 
