@@ -5,6 +5,7 @@ import { useCreateFuelRecord, useAllFuelRecords, checkFuelRecordDuplicate } from
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { checkMultipleFilesForDuplicates, formatDuplicateMessage } from '@/hooks/useDuplicateCheck';
+import { UploadedFuelInvoicesDialog } from '@/components/fleet/UploadedFuelInvoicesDialog';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -641,6 +642,8 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                 </>
               )}
             </Button>
+
+            <UploadedFuelInvoicesDialog />
           </TabsContent>
           
           <TabsContent value="manual" className="mt-4">
