@@ -64,10 +64,8 @@ interface AddFuelInvoiceDialogProps {
 export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'upload' | 'manual'>('upload');
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [station, setStation] = useState('');
   const [lineItems, setLineItems] = useState<FuelLineItem[]>([
-    { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '', isSelected: true }
+    { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: new Date().toISOString().split('T')[0], station: '', isSelected: true }
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -335,8 +333,6 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
       
       if (allLineItems.length > 0) {
         setLineItems(allLineItems);
-        if (lastDate) setInvoiceDate(lastDate);
-        if (lastStation) setStation(lastStation);
         
         toast({
           title: 'Invoices scanned',
@@ -366,7 +362,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   const addLineItem = () => {
     setLineItems(prev => [
       ...prev,
-      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '', isSelected: true }
+      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: new Date().toISOString().split('T')[0], station: '', isSelected: true }
     ]);
   };
 
@@ -434,7 +430,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
     
     // Only submit selected items that have valid data
     const validItems = lineItems.filter(item => 
-      item.isSelected && item.vehicleId && item.litres && item.costPerLitre
+      item.isSelected && item.vehicleId && item.invoiceDate && item.litres && item.costPerLitre
     );
 
     if (validItems.length === 0) {
@@ -459,13 +455,13 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
       await Promise.all(validItems.map(item => 
         createFuelRecord.mutateAsync({
           vehicle_id: item.vehicleId,
-          fill_date: item.invoiceDate || invoiceDate,
+          fill_date: item.invoiceDate,
           litres: parseFloat(item.litres),
           cost_per_litre: parseFloat(item.costPerLitre),
           total_cost: parseFloat(calculateLineTotal(item)),
           mileage: item.mileage ? parseInt(item.mileage) : null,
-          station: item.station || station || null,
-          notes: `Invoice ${item.invoiceDate || invoiceDate}`,
+          station: item.station || null,
+          notes: item.invoiceDate ? `Invoice ${item.invoiceDate}` : null,
           invoice_file_path: uploadedFilePath,
         })
       ));
@@ -488,10 +484,8 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   };
 
   const resetForm = () => {
-    setInvoiceDate(new Date().toISOString().split('T')[0]);
-    setStation('');
     setLineItems([
-      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: '', station: '', isSelected: true }
+      { id: crypto.randomUUID(), vehicleId: '', registration: '', litres: '', costPerLitre: '', mileage: '', invoiceDate: new Date().toISOString().split('T')[0], station: '', isSelected: true }
     ]);
     setFiles([]);
     setActiveTab('upload');
@@ -609,30 +603,6 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
           
           <TabsContent value="manual" className="mt-4">
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="invoiceDate">Invoice Date</Label>
-                  <Input
-                    id="invoiceDate"
-                    type="date"
-                    value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
-                    className="bg-secondary/50"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="station">Station / Supplier</Label>
-                  <Input
-                    id="station"
-                    placeholder="e.g. Shell, BP, Texaco..."
-                    value={station}
-                    onChange={(e) => setStation(e.target.value)}
-                    className="bg-secondary/50"
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
@@ -685,6 +655,7 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                         </TableHead>
                         <TableHead className="p-2">Vehicle</TableHead>
                         <TableHead className="p-2">Date</TableHead>
+                        <TableHead className="p-2">Station</TableHead>
                         <TableHead className="p-2 text-right">Litres</TableHead>
                         <TableHead className="p-2 text-right">£/L</TableHead>
                         <TableHead className="p-2 text-right">Total</TableHead>
@@ -729,8 +700,22 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                                 ))}
                               </select>
                             </TableCell>
-                            <TableCell className="p-2 text-xs text-muted-foreground whitespace-nowrap">
-                              {item.invoiceDate || '—'}
+                            <TableCell className="p-2">
+                              <Input
+                                type="date"
+                                value={item.invoiceDate}
+                                onChange={(e) => updateLineItem(item.id, 'invoiceDate', e.target.value)}
+                                className="text-xs bg-transparent border-0 p-0 h-auto focus-visible:ring-0 w-[110px]"
+                              />
+                            </TableCell>
+                            <TableCell className="p-2">
+                              <Input
+                                type="text"
+                                value={item.station}
+                                onChange={(e) => updateLineItem(item.id, 'station', e.target.value)}
+                                placeholder="Station"
+                                className="text-xs bg-transparent border-0 p-0 h-auto focus-visible:ring-0 w-[80px]"
+                              />
                             </TableCell>
                             <TableCell className="p-2 text-right font-mono text-xs">
                               {parseFloat(item.litres || '0').toFixed(2)}
