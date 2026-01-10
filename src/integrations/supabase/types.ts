@@ -175,6 +175,7 @@ export type Database = {
           id: string
           make: string
           model: string
+          monthly_finance: number | null
           mot_due_date: string | null
           registration: string
           tax_paid_monthly: boolean | null
@@ -189,6 +190,7 @@ export type Database = {
           id?: string
           make: string
           model: string
+          monthly_finance?: number | null
           mot_due_date?: string | null
           registration: string
           tax_paid_monthly?: boolean | null
@@ -203,6 +205,7 @@ export type Database = {
           id?: string
           make?: string
           model?: string
+          monthly_finance?: number | null
           mot_due_date?: string | null
           registration?: string
           tax_paid_monthly?: boolean | null

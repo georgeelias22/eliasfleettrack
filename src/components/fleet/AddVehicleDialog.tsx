@@ -43,6 +43,7 @@ export function AddVehicleDialog({ trigger }: AddVehicleDialogProps) {
         mot_due_date: motDueDate || null,
         annual_tax: null,
         tax_paid_monthly: false,
+        monthly_finance: null,
       });
       
       toast({

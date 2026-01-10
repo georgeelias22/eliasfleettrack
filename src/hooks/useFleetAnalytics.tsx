@@ -8,8 +8,9 @@ export interface FleetAnalytics {
   totalCost: number;
   totalFuelCost: number;
   totalTaxCost: number;
-  costByVehicle: { vehicleId: string; registration: string; make: string; model: string; cost: number; fuelCost: number }[];
-  costByMonth: { month: string; cost: number; fuelCost: number }[];
+  totalFinanceCost: number;
+  costByVehicle: { vehicleId: string; registration: string; make: string; model: string; cost: number; fuelCost: number; financeCost: number }[];
+  costByMonth: { month: string; cost: number; fuelCost: number; financeCost: number }[];
   upcomingMOTs: { vehicle: Vehicle; daysUntil: number }[];
   overdueMOTs: Vehicle[];
   motStats: { valid: number; dueSoon: number; overdue: number; unknown: number };
@@ -65,13 +66,16 @@ export function useFleetAnalytics() {
       // Calculate total fuel costs
       const totalFuelCost = typedFuel.reduce((sum, record) => sum + record.total_cost, 0);
 
-      // Calculate total tax costs
+      // Calculate total tax costs (annual)
       const totalTaxCost = typedVehicles.reduce((sum, v) => sum + (v.annual_tax || 0), 0);
 
-      // Total cost
-      const totalCost = serviceRecordCosts + documentCosts + totalFuelCost + totalTaxCost;
+      // Calculate total finance costs (monthly * 12 for annual)
+      const totalFinanceCost = typedVehicles.reduce((sum, v) => sum + ((v.monthly_finance || 0) * 12), 0);
 
-      // Cost by vehicle (including fuel and tax)
+      // Total cost
+      const totalCost = serviceRecordCosts + documentCosts + totalFuelCost + totalTaxCost + totalFinanceCost;
+
+      // Cost by vehicle (including fuel, tax, and finance)
       const costByVehicle = typedVehicles.map(vehicle => {
         const vehicleServiceCosts = typedRecords
           .filter(r => r.vehicle_id === vehicle.id)
@@ -83,20 +87,25 @@ export function useFleetAnalytics() {
           .filter(f => f.vehicle_id === vehicle.id)
           .reduce((sum, f) => sum + f.total_cost, 0);
         const vehicleTax = vehicle.annual_tax || 0;
+        const vehicleFinance = (vehicle.monthly_finance || 0) * 12; // Annual finance cost
         
         return {
           vehicleId: vehicle.id,
           registration: vehicle.registration,
           make: vehicle.make,
           model: vehicle.model,
-          cost: vehicleServiceCosts + vehicleDocCosts + vehicleFuelCosts + vehicleTax,
+          cost: vehicleServiceCosts + vehicleDocCosts + vehicleFuelCosts + vehicleTax + vehicleFinance,
           fuelCost: vehicleFuelCosts,
+          financeCost: vehicleFinance,
         };
       }).sort((a, b) => b.cost - a.cost);
 
       // Cost by month (last 12 months)
-      const costByMonth: { month: string; cost: number; fuelCost: number }[] = [];
+      const costByMonth: { month: string; cost: number; fuelCost: number; financeCost: number }[] = [];
       const now = new Date();
+      
+      // Calculate monthly finance (sum of all vehicles' monthly finance)
+      const totalMonthlyFinance = typedVehicles.reduce((sum, v) => sum + (v.monthly_finance || 0), 0);
       
       for (let i = 11; i >= 0; i--) {
         const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -117,8 +126,9 @@ export function useFleetAnalytics() {
         
         costByMonth.push({
           month: monthLabel,
-          cost: monthServiceCost + monthDocCost + monthFuelCost,
+          cost: monthServiceCost + monthDocCost + monthFuelCost + totalMonthlyFinance,
           fuelCost: monthFuelCost,
+          financeCost: totalMonthlyFinance,
         });
       }
 
@@ -162,6 +172,7 @@ export function useFleetAnalytics() {
         totalCost,
         totalFuelCost,
         totalTaxCost,
+        totalFinanceCost,
         costByVehicle,
         costByMonth,
         upcomingMOTs,
