@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 interface FuelTrendChartProps {
   data: { 
-    month: string; 
+    month: string;
+    monthKey: string;
     fuelCost: number; 
     litres: number; 
     avgCostPerLitre: number;
