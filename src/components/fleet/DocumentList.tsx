@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDeleteDocument } from '@/hooks/useDocuments';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { DocumentDetailDialog } from './DocumentDetailDialog';
 import { 
   FileText, 
@@ -39,6 +40,12 @@ export function DocumentList({ documents, vehicleId }: DocumentListProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const deleteDocument = useDeleteDocument();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const handleServiceRecordCreated = () => {
+    queryClient.invalidateQueries({ queryKey: ['service-records', vehicleId] });
+    queryClient.invalidateQueries({ queryKey: ['documents', vehicleId] });
+  };
 
   const handleDelete = async (doc: Document, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -187,6 +194,7 @@ export function DocumentList({ documents, vehicleId }: DocumentListProps) {
         document={selectedDocument}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+        onServiceRecordCreated={handleServiceRecordCreated}
       />
     </>
   );

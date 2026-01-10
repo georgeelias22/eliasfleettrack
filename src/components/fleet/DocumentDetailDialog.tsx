@@ -1,6 +1,8 @@
 import { Document } from '@/types/fleet';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCreateServiceRecord } from '@/hooks/useServiceRecords';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +21,8 @@ import {
   Gauge, 
   Building2,
   Wrench,
-  Loader2
+  Loader2,
+  Plus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -28,15 +31,65 @@ interface DocumentDetailDialogProps {
   document: Document | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onServiceRecordCreated?: () => void;
 }
 
-export function DocumentDetailDialog({ document, open, onOpenChange }: DocumentDetailDialogProps) {
+export function DocumentDetailDialog({ document, open, onOpenChange, onServiceRecordCreated }: DocumentDetailDialogProps) {
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
+  const [creatingRecord, setCreatingRecord] = useState(false);
+  const createServiceRecord = useCreateServiceRecord();
+  const queryClient = useQueryClient();
 
   if (!document) return null;
 
   const extractedData = document.ai_extracted_data;
+
+  const handleCreateServiceRecord = async () => {
+    if (!extractedData) return;
+    
+    setCreatingRecord(true);
+    try {
+      // Use the extracted serviceDate from the document, or fall back to today
+      const serviceDate = extractedData.serviceDate || format(new Date(), 'yyyy-MM-dd');
+      
+      await createServiceRecord.mutateAsync({
+        vehicle_id: document.vehicle_id,
+        service_date: serviceDate,
+        service_type: extractedData.serviceType || 'General Service',
+        description: extractedData.description || null,
+        cost: extractedData.totalCost || 0,
+        mileage: extractedData.mileage || null,
+        provider: extractedData.provider || null,
+        notes: null,
+      });
+
+      // Link the document to the service record
+      await supabase
+        .from('documents')
+        .update({ service_record_id: createServiceRecord.data?.id })
+        .eq('id', document.id);
+
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      
+      toast({
+        title: 'Service record created',
+        description: `Added expense for ${format(new Date(serviceDate), 'dd MMM yyyy')}`,
+      });
+      
+      onServiceRecordCreated?.();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error creating service record:', error);
+      toast({
+        title: 'Failed to create record',
+        description: 'Could not create the service record.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreatingRecord(false);
+    }
+  };
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -228,6 +281,34 @@ export function DocumentDetailDialog({ document, open, onOpenChange }: DocumentD
                     ))}
                   </div>
                 </div>
+              )}
+
+              {/* Create Service Record Button */}
+              {!document.service_record_id && (
+                <Button
+                  onClick={handleCreateServiceRecord}
+                  disabled={creatingRecord}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {creatingRecord ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4 mr-2" />
+                  )}
+                  Create Service Record
+                  {extractedData.serviceDate && (
+                    <span className="ml-1 text-muted-foreground">
+                      ({format(new Date(extractedData.serviceDate), 'dd MMM yyyy')})
+                    </span>
+                  )}
+                </Button>
+              )}
+              
+              {document.service_record_id && (
+                <Badge variant="secondary" className="w-full justify-center py-2">
+                  ✓ Linked to Service Record
+                </Badge>
               )}
             </>
           )}
