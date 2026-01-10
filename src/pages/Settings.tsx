@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Copy, User, Webhook, Truck, Check } from 'lucide-react';
+import { ArrowLeft, Copy, User, Webhook, Truck, Check, Gauge } from 'lucide-react';
 import { useState } from 'react';
+import { MileageImportSettings } from '@/components/fleet/MileageImportSettings';
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -195,6 +196,9 @@ const Settings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Mileage Import */}
+        <MileageImportSettings />
 
         {/* Preferences */}
         <Card className="border-border/50 bg-card">

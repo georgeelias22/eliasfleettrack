@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.process-fuel-email]
 verify_jwt = false
+
+[functions.import-mileage]
+verify_jwt = false
