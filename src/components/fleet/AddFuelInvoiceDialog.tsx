@@ -41,14 +41,15 @@ interface FuelLineItem {
 
 interface ExtractedFuelData {
   invoiceDate?: string;
-  station?: string;
   invoiceTotal?: number;
   lineItems?: {
+    transactionDate?: string;
     registration?: string;
     litres?: number;
     costPerLitre?: number;
     totalCost?: number;
     mileage?: number;
+    station?: string;
   }[];
 }
 
@@ -218,10 +219,13 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
           successCount++;
           
           if (extractedData.invoiceDate) lastDate = extractedData.invoiceDate;
-          if (extractedData.station) lastStation = extractedData.station;
           
           if (extractedData.lineItems && extractedData.lineItems.length > 0) {
             extractedData.lineItems.forEach(item => {
+              // Use transaction date for the fill date (when fuel was actually purchased)
+              const fillDate = item.transactionDate || extractedData.invoiceDate || '';
+              if (item.station) lastStation = item.station;
+              
               allLineItems.push({
                 id: crypto.randomUUID(),
                 vehicleId: matchVehicleByRegistration(item.registration || ''),
@@ -229,8 +233,8 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                 litres: item.litres?.toString() || '',
                 costPerLitre: item.costPerLitre?.toString() || '',
                 mileage: item.mileage?.toString() || '',
-                invoiceDate: extractedData.invoiceDate || '',
-                station: extractedData.station || '',
+                invoiceDate: fillDate,
+                station: item.station || '',
               });
               totalItems++;
             });
