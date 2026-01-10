@@ -2,3 +2,6 @@ project_id = "kxtckyujdwmjtazonlbn"
 
 [functions.scan-document]
 verify_jwt = false
+
+[functions.process-fuel-email]
+verify_jwt = false
