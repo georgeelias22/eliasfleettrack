@@ -90,32 +90,34 @@ Analyze the provided fuel invoice and extract detailed information about each fu
 
 ${vehicleList}
 
-CRITICAL - Understand UK fuel invoice terminology:
-- LITRES: The VOLUME of fuel (typically 20-80 litres per fill-up for vans, 30-60 for cars). Look for "L", "Ltr", "Litres" columns.
-- COST PER LITRE (PPL): The PRICE per litre (typically £1.30-£1.80 in UK). Look for "PPL", "Price/L", "£/L" columns.
-- TOTAL COST: The MONEY AMOUNT paid (litres × cost per litre). Look for "Total", "Amount", "Net", "£" columns.
+CRITICAL - UK FUELS / FUEL CARD INVOICE FORMAT:
+These invoices have a "Transaction Detail" table with columns that can be confusing:
+- "Quantity" column = LITRES of fuel (e.g., 54.75, 95.42, 65.51)
+- "PPL" column = Price Per Litre in PENCE (e.g., 116.42 means £1.1642 per litre, 119.08 means £1.1908)
+- "Net Amount £" column = TOTAL COST in pounds (e.g., 63.74, 112.05, 78.01)
+- "Date" column = The ACTUAL TRANSACTION DATE when fuel was purchased (USE THIS as the fill date, NOT the invoice date!)
 
-IMPORTANT: Do NOT confuse total cost with litres! If a number is around £15-£120 it's likely the TOTAL COST, not litres.
-- If you see only total cost and cost per litre, calculate litres = total_cost / cost_per_litre
-- If you see only total cost and litres, calculate cost_per_litre = total_cost / litres
-- UK fuel prices are typically £1.30-£1.80 per litre - use this to validate your extraction
+CRITICAL CONVERSION: PPL is in PENCE! Divide by 100 to get pounds.
+- PPL 116.42 = £1.1642 per litre
+- PPL 119.08 = £1.1908 per litre
 
-For each vehicle/line item on the invoice, extract:
-- Vehicle registration number (match to known registrations if possible, UK format like AB12 CDE)
-- Litres of fuel purchased (VOLUME, typically 20-80 for a fill-up)
-- Cost per litre in GBP (PRICE, typically £1.30-£1.80)
-- Total cost for that line in GBP (MONEY PAID = litres × cost per litre)
-- Mileage (if shown)
+VALIDATION FORMULA: Net Amount ≈ Quantity × (PPL ÷ 100)
+Example: 54.75 litres × (116.42 ÷ 100) = 54.75 × 1.1642 = £63.74 ✓
+
+For EACH transaction row, extract:
+- transactionDate: The DATE from the transaction row (e.g., "06/10/2025" → "2025-10-06") - THIS IS THE FILL DATE
+- registration: Vehicle registration number
+- litres: From the "Quantity" column (the fuel volume)
+- costPerLitre: PPL divided by 100 to convert pence to pounds (e.g., 116.42 → 1.1642)
+- totalCost: From the "Net Amount £" column
+- mileage: If shown
+- station: The station name for this specific transaction
 
 Also extract:
-- Invoice date
-- Station/supplier name
-- Overall invoice total
+- invoiceDate: The invoice date (for reference only, not used for fill dates)
+- invoiceTotal: Total invoice amount
 
-Return all line items found on the invoice. Each line typically represents fuel purchased for a different vehicle.
-If you cannot determine a value, use null.
-
-VALIDATION: Before returning, verify that total_cost ≈ litres × costPerLitre for each line item.`;
+IMPORTANT: Each line item should have its OWN transactionDate - do not use the invoice date!`;
 
     const messages: any[] = [
       { role: "system", content: systemPrompt },
@@ -150,26 +152,27 @@ VALIDATION: Before returning, verify that total_cost ≈ litres × costPerLitre 
             type: "function",
             function: {
               name: "extract_fuel_invoice",
-              description: "Extract structured data from a fuel invoice",
+              description: "Extract structured data from a fuel invoice with individual transaction dates",
               parameters: {
                 type: "object",
                 properties: {
-                  invoiceDate: { type: "string", description: "Invoice date in YYYY-MM-DD format" },
-                  station: { type: "string", description: "Fuel station or supplier name" },
+                  invoiceDate: { type: "string", description: "Invoice date in YYYY-MM-DD format (for reference)" },
                   invoiceTotal: { type: "number", description: "Total invoice amount in GBP" },
                   lineItems: {
                     type: "array",
-                    description: "Individual fuel purchase line items",
+                    description: "Individual fuel purchase line items with their own transaction dates",
                     items: {
                       type: "object",
                       properties: {
+                        transactionDate: { type: "string", description: "The actual transaction/fill date in YYYY-MM-DD format (from the Date column)" },
                         registration: { type: "string", description: "Vehicle registration number" },
-                        litres: { type: "number", description: "Litres of fuel purchased" },
-                        costPerLitre: { type: "number", description: "Cost per litre in GBP" },
-                        totalCost: { type: "number", description: "Total cost for this line in GBP" },
-                        mileage: { type: "number", description: "Vehicle mileage if shown" }
+                        litres: { type: "number", description: "Litres of fuel from the Quantity column" },
+                        costPerLitre: { type: "number", description: "Cost per litre in GBP (PPL divided by 100)" },
+                        totalCost: { type: "number", description: "Total cost from Net Amount column in GBP" },
+                        mileage: { type: "number", description: "Vehicle mileage if shown" },
+                        station: { type: "string", description: "Station name for this transaction" }
                       },
-                      required: ["registration", "litres", "costPerLitre", "totalCost"]
+                      required: ["transactionDate", "registration", "litres", "costPerLitre", "totalCost"]
                     }
                   }
                 },
@@ -237,17 +240,18 @@ VALIDATION: Before returning, verify that total_cost ≈ litres × costPerLitre 
 
     console.log("========== EXTRACTED DATA ==========");
     console.log("📊 Invoice Date:", extractedData?.invoiceDate);
-    console.log("⛽ Station:", extractedData?.station);
     console.log("💰 Invoice Total:", extractedData?.invoiceTotal);
     console.log("📋 Number of line items:", extractedData?.lineItems?.length || 0);
     
     if (extractedData?.lineItems) {
       extractedData.lineItems.forEach((item: any, index: number) => {
         console.log(`\n--- Line Item ${index + 1} ---`);
+        console.log(`  📅 Transaction Date: ${item.transactionDate}`);
         console.log(`  🚗 Registration: ${item.registration}`);
         console.log(`  ⛽ Litres: ${item.litres}`);
         console.log(`  💷 Cost per litre: £${item.costPerLitre}`);
         console.log(`  💰 Total cost: £${item.totalCost}`);
+        console.log(`  ⛽ Station: ${item.station || 'N/A'}`);
         console.log(`  📏 Mileage: ${item.mileage || 'N/A'}`);
         
         // Validation check
@@ -258,11 +262,11 @@ VALIDATION: Before returning, verify that total_cost ≈ litres × costPerLitre 
           console.log(`  ✅ Validation: ${item.litres} × £${item.costPerLitre} = £${calculated.toFixed(2)} (${valid ? 'VALID' : '⚠️ MISMATCH - diff: £' + diff.toFixed(2)})`);
         }
         
-        // Range checks
-        if (item.costPerLitre < 1.20 || item.costPerLitre > 2.00) {
-          console.log(`  ⚠️ WARNING: Cost per litre £${item.costPerLitre} is outside typical UK range (£1.20-£2.00)`);
+        // Range checks - now expecting correct PPL values
+        if (item.costPerLitre < 1.00 || item.costPerLitre > 2.00) {
+          console.log(`  ⚠️ WARNING: Cost per litre £${item.costPerLitre} is outside typical UK range (£1.00-£2.00)`);
         }
-        if (item.litres > 100) {
+        if (item.litres > 150) {
           console.log(`  ⚠️ WARNING: Litres ${item.litres} seems high for a single fill-up`);
         }
       });
