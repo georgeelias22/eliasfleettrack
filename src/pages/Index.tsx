@@ -37,7 +37,7 @@ const Index = () => {
             <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
               <Truck className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h1 className="text-xl font-bold text-foreground">FleetTrack Pro</h1>
+            <h1 className="text-xl font-bold text-foreground">Elias Fleet Track</h1>
           </div>
           <div className="flex items-center gap-2">
             {/* Hide these on mobile */}
