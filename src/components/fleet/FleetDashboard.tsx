@@ -1,4 +1,6 @@
 import { useFleetAnalytics } from '@/hooks/useFleetAnalytics';
+import { useAllFuelRecords } from '@/hooks/useFuelRecords';
+import { useVehicles } from '@/hooks/useVehicles';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -9,15 +11,19 @@ import {
   TrendingUp,
   Calendar,
   Fuel,
-  Droplets
+  Droplets,
+  Receipt
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
 import { UpcomingMOTList } from './UpcomingMOTList';
 import { CostByVehicleChart } from './CostByVehicleChart';
 import { FuelTrendChart } from './FuelTrendChart';
+import { AllFuelRecordsList } from './AllFuelRecordsList';
 
 export function FleetDashboard() {
   const { data: analytics, isLoading, error } = useFleetAnalytics();
+  const { data: fuelRecords = [] } = useAllFuelRecords();
+  const { data: vehicles = [] } = useVehicles();
 
   if (isLoading) {
     return <FleetDashboardSkeleton />;
@@ -148,21 +154,37 @@ export function FleetDashboard() {
         </Card>
       </div>
 
-      {/* Upcoming MOTs */}
-      <Card className="border-border/50 gradient-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Calendar className="w-4 h-4 text-status-warning" />
-            Upcoming MOT Dates
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <UpcomingMOTList 
-            upcomingMOTs={analytics.upcomingMOTs} 
-            overdueMOTs={analytics.overdueMOTs} 
-          />
-        </CardContent>
-      </Card>
+      {/* Bottom Row - MOTs and Fuel Records */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Upcoming MOTs */}
+        <Card className="border-border/50 gradient-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Calendar className="w-4 h-4 text-status-warning" />
+              Upcoming MOT Dates
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <UpcomingMOTList 
+              upcomingMOTs={analytics.upcomingMOTs} 
+              overdueMOTs={analytics.overdueMOTs} 
+            />
+          </CardContent>
+        </Card>
+
+        {/* All Fuel Records */}
+        <Card className="border-border/50 gradient-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Receipt className="w-4 h-4 text-amber-500" />
+              Fuel Records ({fuelRecords.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AllFuelRecordsList records={fuelRecords} vehicles={vehicles} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
