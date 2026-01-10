@@ -656,125 +656,100 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                   </div>
                 </div>
                 
-                <div className="max-h-[250px] overflow-y-auto overscroll-contain touch-pan-y">
-                  <div className="space-y-3 pr-2">
-                    {lineItems.map((item, index) => {
-                      const itemDuplicateInfo = duplicateInfo[item.id];
-                      const isDuplicate = itemDuplicateInfo?.isDuplicate;
-                      
-                      return (
-                        <div 
-                          key={item.id} 
-                          className={cn(
-                            "p-4 rounded-lg border space-y-3 transition-colors",
-                            isDuplicate 
-                              ? "border-destructive/50 bg-destructive/5" 
-                              : item.isSelected 
-                                ? "border-primary/50 bg-primary/5"
-                                : "border-border bg-secondary/30"
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                <div className="max-h-[300px] overflow-y-auto overscroll-contain touch-pan-y border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-secondary/50 sticky top-0">
+                      <tr className="border-b">
+                        <th className="p-2 text-left w-8">
+                          <Checkbox
+                            checked={selectedCount === lineItems.length}
+                            onCheckedChange={(checked) => checked ? selectAll() : deselectAll()}
+                          />
+                        </th>
+                        <th className="p-2 text-left">Vehicle</th>
+                        <th className="p-2 text-left">Date</th>
+                        <th className="p-2 text-right">Litres</th>
+                        <th className="p-2 text-right">£/L</th>
+                        <th className="p-2 text-right">Total</th>
+                        <th className="p-2 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lineItems.map((item, index) => {
+                        const itemDuplicateInfo = duplicateInfo[item.id];
+                        const isDuplicate = itemDuplicateInfo?.isDuplicate;
+                        const vehicle = vehicles.find(v => v.id === item.vehicleId);
+                        
+                        return (
+                          <tr 
+                            key={item.id} 
+                            className={cn(
+                              "border-b last:border-b-0 transition-colors",
+                              isDuplicate 
+                                ? "bg-destructive/10" 
+                                : item.isSelected 
+                                  ? "bg-primary/5"
+                                  : "hover:bg-secondary/30"
+                            )}
+                          >
+                            <td className="p-2">
                               <Checkbox
                                 checked={item.isSelected}
                                 onCheckedChange={() => toggleItemSelection(item.id)}
-                                className={cn(
-                                  isDuplicate && "border-destructive"
-                                )}
                               />
-                              <span className="text-sm font-medium text-muted-foreground">
-                                Line {index + 1}
-                              </span>
+                            </td>
+                            <td className="p-2">
+                              <Select
+                                value={item.vehicleId}
+                                onValueChange={(value) => updateLineItem(item.id, 'vehicleId', value)}
+                              >
+                                <SelectTrigger className="h-8 text-xs bg-transparent border-0 p-0 shadow-none">
+                                  <SelectValue placeholder={item.registration || "Select"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {vehicles.map((v) => (
+                                    <SelectItem key={v.id} value={v.id}>
+                                      {v.registration}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="p-2 text-xs text-muted-foreground">
+                              {item.invoiceDate || invoiceDate}
+                            </td>
+                            <td className="p-2 text-right font-mono text-xs">
+                              {parseFloat(item.litres || '0').toFixed(2)}
+                            </td>
+                            <td className="p-2 text-right font-mono text-xs">
+                              £{parseFloat(item.costPerLitre || '0').toFixed(3)}
+                            </td>
+                            <td className="p-2 text-right font-medium text-xs">
+                              £{calculateLineTotal(item)}
                               {isDuplicate && (
-                                <Badge variant="destructive" className="gap-1 text-xs">
-                                  <AlertTriangle className="w-3 h-3" />
-                                  Duplicate
+                                <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">
+                                  DUP
                                 </Badge>
                               )}
-                              {item.registration && !item.vehicleId && (
-                                <span className="text-sm text-amber-500">
-                                  (Reg: {item.registration} - select vehicle)
-                                </span>
+                            </td>
+                            <td className="p-2">
+                              {lineItems.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-destructive hover:text-destructive"
+                                  onClick={() => removeLineItem(item.id)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
                               )}
-                            </div>
-                            {lineItems.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => removeLineItem(item.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        
-                        <div className="space-y-2">
-                          <Label>Vehicle</Label>
-                          <Select
-                            value={item.vehicleId}
-                            onValueChange={(value) => updateLineItem(item.id, 'vehicleId', value)}
-                          >
-                            <SelectTrigger className="bg-secondary/50">
-                              <SelectValue placeholder="Select vehicle" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {vehicles.map((vehicle) => (
-                                <SelectItem key={vehicle.id} value={vehicle.id}>
-                                  {vehicle.registration} - {vehicle.make} {vehicle.model}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-2">
-                            <Label>Litres</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="45.5"
-                              value={item.litres}
-                              onChange={(e) => updateLineItem(item.id, 'litres', e.target.value)}
-                              className="bg-secondary/50"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>£/Litre</Label>
-                            <Input
-                              type="number"
-                              step="0.001"
-                              placeholder="1.459"
-                              value={item.costPerLitre}
-                              onChange={(e) => updateLineItem(item.id, 'costPerLitre', e.target.value)}
-                              className="bg-secondary/50"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Mileage</Label>
-                            <Input
-                              type="number"
-                              placeholder="45000"
-                              value={item.mileage}
-                              onChange={(e) => updateLineItem(item.id, 'mileage', e.target.value)}
-                              className="bg-secondary/50"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                          <span className="text-sm text-muted-foreground">Line Total</span>
-                          <span className="font-semibold text-primary">
-                            £{calculateLineTotal(item)}
-                          </span>
-                        </div>
-                      </div>
-                      );
-                    })}
-                  </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
