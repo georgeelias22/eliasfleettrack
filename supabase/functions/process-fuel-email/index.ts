@@ -215,6 +215,7 @@ Return structured JSON data.`;
     // Match registrations to vehicle IDs and create fuel records
     const createdRecords: any[] = [];
     const failedRecords: any[] = [];
+    const skippedDuplicates: any[] = [];
 
     for (const item of extractedData.lineItems) {
       // Try to match registration
@@ -231,15 +232,41 @@ Return structured JSON data.`;
         continue;
       }
 
+      const fillDate = extractedData.invoiceDate || new Date().toISOString().split("T")[0];
+      const litres = item.litres || 0;
+      const totalCost = item.totalCost || (item.litres || 0) * (item.costPerLitre || 0);
+
+      // Check for duplicate: same vehicle, same date, similar litres or cost
+      const { data: existingRecords } = await supabase
+        .from("fuel_records")
+        .select("id, litres, total_cost")
+        .eq("vehicle_id", matchedVehicle.id)
+        .eq("fill_date", fillDate);
+
+      const isDuplicate = existingRecords?.some((record) => {
+        // Consider it a duplicate if litres match within 0.5L or total cost matches within £1
+        const litresDiff = Math.abs(record.litres - litres);
+        const costDiff = Math.abs(record.total_cost - totalCost);
+        return litresDiff < 0.5 || costDiff < 1;
+      });
+
+      if (isDuplicate) {
+        skippedDuplicates.push({
+          ...item,
+          reason: `Duplicate record found for ${item.registration} on ${fillDate}`,
+        });
+        continue;
+      }
+
       // Create fuel record
       const { data: fuelRecord, error: insertError } = await supabase
         .from("fuel_records")
         .insert({
           vehicle_id: matchedVehicle.id,
-          fill_date: extractedData.invoiceDate || new Date().toISOString().split("T")[0],
-          litres: item.litres || 0,
+          fill_date: fillDate,
+          litres: litres,
           cost_per_litre: item.costPerLitre || 0,
-          total_cost: item.totalCost || (item.litres || 0) * (item.costPerLitre || 0),
+          total_cost: totalCost,
           mileage: item.mileage || null,
           station: extractedData.station || null,
           notes: `Auto-imported from email: ${fileName}`,
@@ -261,8 +288,9 @@ Return structured JSON data.`;
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processed invoice: ${createdRecords.length} records created, ${failedRecords.length} failed`,
+        message: `Processed invoice: ${createdRecords.length} created, ${skippedDuplicates.length} duplicates skipped, ${failedRecords.length} failed`,
         createdRecords,
+        skippedDuplicates,
         failedRecords,
         extractedData,
       }),
