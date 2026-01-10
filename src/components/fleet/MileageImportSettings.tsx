@@ -18,8 +18,7 @@ export function MileageImportSettings() {
     registration: "AB12 CDE",
     daily_mileage: 45,
     record_date: new Date().toISOString().split('T')[0],
-    odometer_reading: 12500,
-    user_id: user?.id || "your-user-id"
+    odometer_reading: 12500
   };
 
   const copyToClipboard = async (text: string) => {
@@ -63,24 +62,13 @@ export function MileageImportSettings() {
         </div>
 
         <div className="space-y-2">
-          <Label>Your User ID</Label>
-          <div className="flex gap-2">
-            <Input 
-              value={user?.id || ''} 
-              readOnly 
-              className="font-mono text-xs"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => copyToClipboard(user?.id || '')}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-          </div>
+          <Label>Authentication</Label>
           <p className="text-xs text-muted-foreground">
-            Include this in your Zapier webhook payload
+            This endpoint requires authentication. Include your access token in the Authorization header:
           </p>
+          <pre className="bg-muted p-2 rounded-md text-xs overflow-x-auto">
+            Authorization: Bearer YOUR_ACCESS_TOKEN
+          </pre>
         </div>
 
         <div className="space-y-2">
@@ -97,8 +85,8 @@ export function MileageImportSettings() {
             <li>Set your tracker provider as the trigger (e.g., email or webhook)</li>
             <li>Add a "Webhooks by Zapier" action with "POST" method</li>
             <li>Paste the webhook URL above</li>
-            <li>Set payload type to JSON and include the required fields</li>
-            <li>Map your tracker data to: registration, daily_mileage, and user_id</li>
+            <li>Add Authorization header with your access token</li>
+            <li>Set payload type to JSON and include: registration, daily_mileage</li>
           </ol>
         </div>
       </CardContent>
