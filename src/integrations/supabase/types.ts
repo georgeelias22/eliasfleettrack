@@ -71,6 +71,51 @@ export type Database = {
           },
         ]
       }
+      drivers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          last_check_code_date: string | null
+          license_expiry_date: string | null
+          license_number: string | null
+          name: string
+          next_check_code_due: string | null
+          notes: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          last_check_code_date?: string | null
+          license_expiry_date?: string | null
+          license_number?: string | null
+          name: string
+          next_check_code_due?: string | null
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          last_check_code_date?: string | null
+          license_expiry_date?: string | null
+          license_number?: string | null
+          name?: string
+          next_check_code_due?: string | null
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       fuel_records: {
         Row: {
           cost_per_litre: number
@@ -114,6 +159,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fuel_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_schedules: {
+        Row: {
+          created_at: string
+          id: string
+          interval_miles: number | null
+          interval_months: number | null
+          is_active: boolean
+          last_completed_date: string | null
+          last_completed_mileage: number | null
+          maintenance_type: string
+          next_due_date: string | null
+          next_due_mileage: number | null
+          notes: string | null
+          updated_at: string
+          user_id: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          interval_miles?: number | null
+          interval_months?: number | null
+          is_active?: boolean
+          last_completed_date?: string | null
+          last_completed_mileage?: number | null
+          maintenance_type: string
+          next_due_date?: string | null
+          next_due_mileage?: number | null
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          interval_miles?: number | null
+          interval_months?: number | null
+          is_active?: boolean
+          last_completed_date?: string | null
+          last_completed_mileage?: number | null
+          maintenance_type?: string
+          next_due_date?: string | null
+          next_due_mileage?: number | null
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_schedules_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
