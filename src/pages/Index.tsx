@@ -10,7 +10,7 @@ import { FleetDashboard } from '@/components/fleet/FleetDashboard';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Truck, LogOut, Loader2, LayoutDashboard, Car, Settings } from 'lucide-react';
+import { Truck, LogOut, Loader2, LayoutDashboard, Car, Settings, BarChart3 } from 'lucide-react';
 
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -47,6 +47,9 @@ const Index = () => {
               <AddVehicleDialog />
             </div>
             <ThemeToggle />
+            <Button variant="ghost" size="icon" onClick={() => navigate('/reports')}>
+              <BarChart3 className="w-5 h-5" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
               <Settings className="w-5 h-5" />
             </Button>
