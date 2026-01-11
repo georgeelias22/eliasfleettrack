@@ -126,7 +126,7 @@ export default function VehicleDetail() {
 
   return (
     <div className="min-h-screen gradient-hero">
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50 safe-area-top">
         <div className="container mx-auto px-4 py-4">
           <Button variant="ghost" onClick={() => navigate('/')} className="mb-2">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back
