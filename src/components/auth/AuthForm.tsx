@@ -8,11 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Truck, Loader2 } from 'lucide-react';
 
 export function AuthForm() {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn } = useAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,9 +19,7 @@ export function AuthForm() {
     setLoading(true);
 
     try {
-      const { error } = isSignUp 
-        ? await signUp(email, password)
-        : await signIn(email, password);
+      const { error } = await signIn(email, password);
 
       if (error) {
         toast({
@@ -30,12 +27,6 @@ export function AuthForm() {
           description: error.message,
           variant: 'destructive',
         });
-      } else if (isSignUp) {
-        toast({
-          title: 'Account created',
-          description: 'You can now sign in with your credentials.',
-        });
-        setIsSignUp(false);
       }
     } finally {
       setLoading(false);
@@ -52,7 +43,7 @@ export function AuthForm() {
           <div>
             <CardTitle className="text-2xl font-bold">FleetTrack Pro</CardTitle>
             <CardDescription className="text-muted-foreground">
-              {isSignUp ? 'Create an account to manage your fleet' : 'Sign in to your fleet dashboard'}
+              Sign in to your fleet dashboard
             </CardDescription>
           </div>
         </CardHeader>
@@ -89,22 +80,14 @@ export function AuthForm() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Please wait...
                 </>
-              ) : isSignUp ? (
-                'Create Account'
               ) : (
                 'Sign In'
               )}
             </Button>
           </form>
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-            </button>
-          </div>
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Contact your administrator for account access
+          </p>
         </CardContent>
       </Card>
     </div>
