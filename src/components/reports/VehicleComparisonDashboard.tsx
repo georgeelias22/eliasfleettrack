@@ -10,6 +10,7 @@ import { useFleetAnalytics } from '@/hooks/useFleetAnalytics';
 import { calculateVehicleMetrics } from '@/hooks/useVehicleComparison';
 import { VehicleComparison } from '@/types/reports';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { ChartTooltip } from '@/components/ui/chart-tooltip';
 import { Car, DollarSign, Fuel, Gauge, Wrench, Leaf, Save } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
 
@@ -253,11 +254,11 @@ export function VehicleComparisonDashboard({ onSaveReport }: VehicleComparisonDa
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={costChartData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" tickFormatter={(v) => `£${v}`} className="text-muted-foreground" />
-                    <YAxis type="category" dataKey="name" width={80} className="text-muted-foreground" />
-                    <Tooltip formatter={(value) => `£${Number(value).toFixed(2)}`} />
-                    <Legend />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
+                    <XAxis type="number" tickFormatter={(v) => `£${v}`} stroke="hsl(var(--chart-text))" tick={{ fill: 'hsl(var(--chart-text))' }} />
+                    <YAxis type="category" dataKey="name" width={80} stroke="hsl(var(--chart-text))" tick={{ fill: 'hsl(var(--chart-text))' }} />
+                    <Tooltip content={<ChartTooltip formatter={(v) => `£${v.toFixed(2)}`} />} />
+                    <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
                     <Bar dataKey="Fuel" stackId="a" fill="hsl(var(--chart-1))" />
                     <Bar dataKey="Service" stackId="a" fill="hsl(var(--chart-2))" />
                     <Bar dataKey="Fixed" stackId="a" fill="hsl(var(--chart-3))" />
@@ -280,12 +281,12 @@ export function VehicleComparisonDashboard({ onSaveReport }: VehicleComparisonDa
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={efficiencyChartData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="name" className="text-muted-foreground" />
-                      <YAxis className="text-muted-foreground" />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="MPG" fill="hsl(var(--primary))" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
+                      <XAxis dataKey="name" stroke="hsl(var(--chart-text))" tick={{ fill: 'hsl(var(--chart-text))' }} />
+                      <YAxis stroke="hsl(var(--chart-text))" tick={{ fill: 'hsl(var(--chart-text))' }} />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
+                      <Bar dataKey="MPG" fill="hsl(var(--chart-1))" />
                       <Bar dataKey="Cost/Mile (p)" fill="hsl(var(--chart-4))" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -304,9 +305,9 @@ export function VehicleComparisonDashboard({ onSaveReport }: VehicleComparisonDa
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <RadarChart data={radarData}>
-                      <PolarGrid className="stroke-muted" />
-                      <PolarAngleAxis dataKey="metric" className="text-muted-foreground text-xs" />
-                      <PolarRadiusAxis angle={30} domain={[0, 100]} className="text-muted-foreground" />
+                      <PolarGrid stroke="hsl(var(--chart-grid))" />
+                      <PolarAngleAxis dataKey="metric" tick={{ fill: 'hsl(var(--chart-text))', fontSize: 12 }} />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'hsl(var(--chart-text))' }} stroke="hsl(var(--chart-grid))" />
                       {comparisons.map((comp, idx) => (
                         <Radar
                           key={comp.vehicleId}
@@ -317,7 +318,7 @@ export function VehicleComparisonDashboard({ onSaveReport }: VehicleComparisonDa
                           fillOpacity={0.2}
                         />
                       ))}
-                      <Legend />
+                      <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
                     </RadarChart>
                   </ResponsiveContainer>
                 </div>

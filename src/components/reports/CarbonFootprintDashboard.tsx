@@ -9,6 +9,7 @@ import { useVehicles } from '@/hooks/useVehicles';
 import { useFleetAnalytics } from '@/hooks/useFleetAnalytics';
 import { CO2_FACTORS, CO2_PER_TREE_PER_YEAR, CarbonFootprint } from '@/types/reports';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { ChartTooltip } from '@/components/ui/chart-tooltip';
 import { Leaf, TreePine, TrendingDown, AlertTriangle, Save, Car, Fuel } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
 
@@ -278,13 +279,14 @@ export function CarbonFootprintDashboard({ onSaveReport }: CarbonFootprintDashbo
                         fill="hsl(var(--primary))"
                         dataKey="value"
                         label={({ name, value }) => `${name}: ${(value / 1000).toFixed(1)}t`}
+                        labelLine={{ stroke: 'hsl(var(--chart-text))' }}
                       >
                         {pieData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => `${Number(value).toFixed(0)} kg CO₂`} />
-                      <Legend />
+                      <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(0)} kg CO₂`} />} />
+                      <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -302,10 +304,10 @@ export function CarbonFootprintDashboard({ onSaveReport }: CarbonFootprintDashbo
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={emissionsByFuelType}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="name" className="text-muted-foreground" />
-                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} className="text-muted-foreground" />
-                      <Tooltip formatter={(value) => `${Number(value).toFixed(0)} kg CO₂`} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
+                      <XAxis dataKey="name" stroke="hsl(var(--chart-text))" tick={{ fill: 'hsl(var(--chart-text))' }} />
+                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} stroke="hsl(var(--chart-text))" tick={{ fill: 'hsl(var(--chart-text))' }} />
+                      <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(0)} kg CO₂`} />} />
                       <Bar dataKey="value" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
