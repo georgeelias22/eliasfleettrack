@@ -14,7 +14,6 @@ import {
   Car
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
-import { UpcomingMOTList } from './UpcomingMOTList';
 import { CostByVehicleChart } from './CostByVehicleChart';
 import { FuelTrendChart } from './FuelTrendChart';
 import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
@@ -22,6 +21,7 @@ import { AllFuelRecordsList } from './AllFuelRecordsList';
 import { TwelveMonthSummary } from './TwelveMonthSummary';
 import { AddFuelInvoiceDialog } from './AddFuelInvoiceDialog';
 import { AddVehicleDialog } from './AddVehicleDialog';
+import { CombinedRemindersWidget } from './CombinedRemindersWidget';
 
 export function FleetDashboard() {
   const { data: analytics, isLoading, error } = useFleetAnalytics();
@@ -159,23 +159,13 @@ export function FleetDashboard() {
         </Card>
       </div>
 
-      {/* Bottom Row - MOTs and Fuel Records */}
+      {/* Bottom Row - Reminders and Fuel Records */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upcoming MOTs */}
-        <Card className="border-border/50 bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Calendar className="w-4 h-4 text-status-warning" />
-              Upcoming MOT Dates
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <UpcomingMOTList 
-              upcomingMOTs={analytics.upcomingMOTs} 
-              overdueMOTs={analytics.overdueMOTs} 
-            />
-          </CardContent>
-        </Card>
+        {/* Combined Reminders Widget */}
+        <CombinedRemindersWidget 
+          upcomingMOTs={analytics.upcomingMOTs} 
+          overdueMOTs={analytics.overdueMOTs} 
+        />
 
         {/* All Fuel Records */}
         <Card className="border-border/50 bg-card">
