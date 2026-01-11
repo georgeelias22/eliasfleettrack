@@ -159,6 +159,39 @@ export type Database = {
           },
         ]
       }
+      saved_reports: {
+        Row: {
+          config: Json
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          report_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          report_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          report_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       service_records: {
         Row: {
           cost: number
@@ -234,6 +267,7 @@ export type Database = {
         Row: {
           annual_tax: number | null
           created_at: string
+          fuel_type: string | null
           id: string
           is_active: boolean
           make: string
@@ -250,6 +284,7 @@ export type Database = {
         Insert: {
           annual_tax?: number | null
           created_at?: string
+          fuel_type?: string | null
           id?: string
           is_active?: boolean
           make: string
@@ -266,6 +301,7 @@ export type Database = {
         Update: {
           annual_tax?: number | null
           created_at?: string
+          fuel_type?: string | null
           id?: string
           is_active?: boolean
           make?: string

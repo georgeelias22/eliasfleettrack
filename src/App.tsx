@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import VehicleDetail from "./pages/VehicleDetail";
 import Settings from "./pages/Settings";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/vehicle/:id" element={<VehicleDetail />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/reports" element={<Reports />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
