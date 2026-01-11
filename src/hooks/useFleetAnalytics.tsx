@@ -139,7 +139,12 @@ export function useFleetAnalytics() {
           .reduce((sum, r) => sum + (r.cost || 0), 0);
         
         const monthDocCost = typedDocs
-          .filter(d => d.created_at.startsWith(monthKey))
+          .filter(d => {
+            // Use AI-extracted service date if available, otherwise fall back to created_at
+            const extractedData = d.ai_extracted_data as { serviceDate?: string } | null;
+            const effectiveDate = extractedData?.serviceDate || d.created_at;
+            return effectiveDate.startsWith(monthKey);
+          })
           .reduce((sum, d) => sum + (d.extracted_cost || 0), 0);
 
         const monthFuelCost = typedFuel
