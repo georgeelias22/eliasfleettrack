@@ -33,14 +33,19 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     const expectedApiKey = Deno.env.get("FUEL_IMPORT_API_KEY");
 
-    // Check for API key authentication (for n8n/external services)
-    const apiKey = req.headers.get("x-api-key");
+    // Parse URL parameters for simple webhook usage
+    const url = new URL(req.url);
+    const urlApiKey = url.searchParams.get("api_key") || url.searchParams.get("key");
+    const urlUserId = url.searchParams.get("user_id") || url.searchParams.get("userId");
+
+    // Check for API key authentication (header or URL param)
+    const apiKey = req.headers.get("x-api-key") || urlApiKey;
     const authHeader = req.headers.get("authorization");
     
-    let userId: string | null = null;
+    let userId: string | null = urlUserId;
 
     if (apiKey) {
-      // API key authentication for n8n
+      // API key authentication for n8n/webhooks
       if (!expectedApiKey || apiKey !== expectedApiKey) {
         return new Response(
           JSON.stringify({ error: "Invalid API key" }),
@@ -66,7 +71,7 @@ serve(async (req) => {
       userId = claimsData.user.id;
     } else {
       return new Response(
-        JSON.stringify({ error: "Unauthorized - provide x-api-key header or Bearer token" }),
+        JSON.stringify({ error: "Unauthorized - provide api_key URL parameter, x-api-key header, or Bearer token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
