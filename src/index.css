@@ -64,6 +64,11 @@
     --sidebar-ring: 217 91% 50%;
 
     /* Chart colors for light mode */
+    --chart-1: 217 91% 50%;
+    --chart-2: 142 70% 40%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 280 70% 50%;
+    --chart-5: 190 80% 45%;
     --chart-text: 215 16% 47%;
     --chart-grid: 214 32% 85%;
   }
@@ -126,7 +131,12 @@
     --sidebar-border: 217 30% 25%;
     --sidebar-ring: 217 91% 65%;
 
-    /* Chart colors for dark mode - improved visibility */
+    /* Chart colors for dark mode - bright and visible */
+    --chart-1: 217 91% 65%;
+    --chart-2: 142 70% 55%;
+    --chart-3: 38 92% 60%;
+    --chart-4: 280 70% 65%;
+    --chart-5: 190 80% 55%;
     --chart-text: 215 20% 75%;
     --chart-grid: 217 30% 30%;
   }
