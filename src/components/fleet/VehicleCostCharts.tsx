@@ -51,9 +51,13 @@ export function VehicleCostCharts({
         .filter(r => r.service_date.startsWith(monthKey))
         .reduce((sum, r) => sum + (r.cost || 0), 0);
 
-      // Document extracted costs for this month
+      // Document extracted costs for this month (use extracted serviceDate if available)
       const docCost = documents
-        .filter(d => d.created_at.startsWith(monthKey))
+        .filter(d => {
+          const extractedData = d.ai_extracted_data as { serviceDate?: string } | null;
+          const effectiveDate = extractedData?.serviceDate || d.created_at;
+          return effectiveDate.startsWith(monthKey);
+        })
         .reduce((sum, d) => sum + (d.extracted_cost || 0), 0);
 
       const totalService = serviceCost + docCost;
