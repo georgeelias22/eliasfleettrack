@@ -10,9 +10,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCreateVehicle } from '@/hooks/useVehicles';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Loader2 } from 'lucide-react';
+
+const FUEL_TYPES = [
+  { value: 'petrol', label: 'Petrol' },
+  { value: 'diesel', label: 'Diesel' },
+  { value: 'hybrid', label: 'Hybrid' },
+  { value: 'plug-in hybrid', label: 'Plug-in Hybrid' },
+  { value: 'electric', label: 'Electric' },
+];
 
 interface AddVehicleDialogProps {
   trigger?: React.ReactNode;
@@ -26,6 +35,7 @@ export function AddVehicleDialog({ trigger }: AddVehicleDialogProps) {
   const [year, setYear] = useState('');
   const [vin, setVin] = useState('');
   const [motDueDate, setMotDueDate] = useState('');
+  const [fuelType, setFuelType] = useState('petrol');
   
   const createVehicle = useCreateVehicle();
   const { toast } = useToast();
@@ -41,6 +51,7 @@ export function AddVehicleDialog({ trigger }: AddVehicleDialogProps) {
         year: year ? parseInt(year) : null,
         vin: vin || null,
         mot_due_date: motDueDate || null,
+        fuel_type: fuelType,
         annual_tax: null,
         tax_paid_monthly: false,
         monthly_finance: null,
@@ -70,6 +81,7 @@ export function AddVehicleDialog({ trigger }: AddVehicleDialogProps) {
     setYear('');
     setVin('');
     setMotDueDate('');
+    setFuelType('petrol');
   };
 
   return (
@@ -152,15 +164,30 @@ export function AddVehicleDialog({ trigger }: AddVehicleDialogProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vin">VIN</Label>
-              <Input
-                id="vin"
-                placeholder="Optional"
-                value={vin}
-                onChange={(e) => setVin(e.target.value)}
-                className="bg-secondary/50"
-              />
+              <Label htmlFor="fuel-type">Fuel Type</Label>
+              <Select value={fuelType} onValueChange={setFuelType}>
+                <SelectTrigger className="bg-secondary/50">
+                  <SelectValue placeholder="Select fuel type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FUEL_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vin">VIN (optional)</Label>
+            <Input
+              id="vin"
+              placeholder="Vehicle Identification Number"
+              value={vin}
+              onChange={(e) => setVin(e.target.value)}
+              className="bg-secondary/50"
+            />
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

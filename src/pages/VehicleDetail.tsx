@@ -19,10 +19,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Car, Loader2, Save, Trash2, Fuel, Power } from 'lucide-react';
+import { ArrowLeft, Car, Loader2, Save, Trash2, Fuel, Power, Leaf } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
+
+const FUEL_TYPES = [
+  { value: 'petrol', label: 'Petrol', co2: 2.31 },
+  { value: 'diesel', label: 'Diesel', co2: 2.68 },
+  { value: 'hybrid', label: 'Hybrid', co2: 1.85 },
+  { value: 'plug-in hybrid', label: 'Plug-in Hybrid', co2: 1.20 },
+  { value: 'electric', label: 'Electric', co2: 0 },
+];
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,10 +61,14 @@ export default function VehicleDetail() {
   const deleteVehicle = useDeleteVehicle();
 
   const [motDate, setMotDate] = useState('');
+  const [fuelType, setFuelType] = useState('petrol');
 
   useEffect(() => {
     if (vehicle?.mot_due_date) {
       setMotDate(vehicle.mot_due_date);
+    }
+    if ((vehicle as any)?.fuel_type) {
+      setFuelType((vehicle as any).fuel_type);
     }
   }, [vehicle]);
 
@@ -84,6 +97,15 @@ export default function VehicleDetail() {
     try {
       await updateVehicle.mutateAsync({ id: vehicle.id, mot_due_date: motDate || null });
       toast({ title: 'MOT date updated' });
+    } catch {
+      toast({ title: 'Failed to update', variant: 'destructive' });
+    }
+  };
+
+  const handleUpdateFuelType = async () => {
+    try {
+      await updateVehicle.mutateAsync({ id: vehicle.id, fuel_type: fuelType } as any);
+      toast({ title: 'Fuel type updated' });
     } catch {
       toast({ title: 'Failed to update', variant: 'destructive' });
     }
@@ -195,6 +217,50 @@ export default function VehicleDetail() {
                 <Button onClick={handleUpdateMOT} disabled={updateVehicle.isPending} className="self-end gradient-primary">
                   <Save className="w-4 h-4 mr-2" /> Save
                 </Button>
+              </CardContent>
+            </Card>
+
+            {/* Fuel Type */}
+            <Card className="border-border/50 gradient-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Leaf className="w-5 h-5 text-green-500" />
+                  Fuel Type
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1 space-y-2">
+                    <Label>Vehicle Fuel Type</Label>
+                    <Select value={fuelType} onValueChange={setFuelType}>
+                      <SelectTrigger className="bg-secondary/50">
+                        <SelectValue placeholder="Select fuel type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FUEL_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            <div className="flex items-center justify-between gap-4">
+                              <span>{type.label}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {type.co2 > 0 ? `${type.co2} kg CO₂/L` : 'Zero emissions'}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Used for carbon footprint calculations in reports
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleUpdateFuelType} 
+                    disabled={updateVehicle.isPending || fuelType === (vehicle as any).fuel_type} 
+                    className="gradient-primary"
+                  >
+                    <Save className="w-4 h-4 mr-2" /> Save
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
