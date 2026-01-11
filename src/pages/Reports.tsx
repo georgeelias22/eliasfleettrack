@@ -56,7 +56,7 @@ export default function Reports() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-50">
+      <header className="border-b bg-card sticky top-0 z-50 safe-area-top">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
