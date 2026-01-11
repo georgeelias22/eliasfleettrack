@@ -133,19 +133,24 @@ const Settings = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3">
+              <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                <strong>Simple Webhook:</strong> Use this URL with your API key and User ID as parameters. No headers needed!
+              </p>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="webhookUrl">Webhook URL</Label>
+              <Label>Your Webhook URL (copy this)</Label>
               <div className="flex gap-2">
                 <Input
-                  id="webhookUrl"
-                  value={webhookUrl}
+                  value={`${webhookUrl}?api_key=YOUR_API_KEY&user_id=${user.id}`}
                   readOnly
                   className="bg-muted/50 font-mono text-xs"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => copyToClipboard(webhookUrl, 'Webhook URL')}
+                  onClick={() => copyToClipboard(`${webhookUrl}?api_key=YOUR_API_KEY&user_id=${user.id}`, 'Webhook URL')}
                 >
                   {copiedField === 'Webhook URL' ? (
                     <Check className="w-4 h-4 text-emerald-500" />
@@ -154,67 +159,38 @@ const Settings = () => {
                   )}
                 </Button>
               </div>
-            </div>
-
-            <div className="rounded-lg bg-muted/30 p-4 space-y-3">
-              <h4 className="font-medium text-sm">n8n Workflow Setup</h4>
-              <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                <li>Add <strong>IMAP Email Read</strong> or <strong>Email Trigger</strong> node</li>
-                <li>Configure to fetch emails with fuel invoice attachments</li>
-                <li>Add an <strong>HTTP Request</strong> node with these settings:
-                  <ul className="ml-6 mt-1 space-y-1 list-disc">
-                    <li>Method: <code className="bg-muted px-1 rounded">POST</code></li>
-                    <li>URL: <code className="bg-muted px-1 rounded text-xs break-all">{webhookUrl}</code></li>
-                  </ul>
-                </li>
-                <li>Add header: <code className="bg-muted px-1 rounded">x-api-key</code> with your API key</li>
-                <li>Set Body Content Type to <strong>JSON</strong></li>
-                <li>Send JSON body with the fields below</li>
-              </ol>
-            </div>
-
-            <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
-              <p className="text-sm text-amber-600 dark:text-amber-400">
-                <strong>API Key Required:</strong> Set up the <code className="bg-muted px-1 rounded">FUEL_IMPORT_API_KEY</code> secret in your backend settings. Use this same key in the <code className="bg-muted px-1 rounded">x-api-key</code> header.
+              <p className="text-xs text-muted-foreground">
+                Replace <code className="bg-muted px-1 rounded">YOUR_API_KEY</code> with your <code className="bg-muted px-1 rounded">FUEL_IMPORT_API_KEY</code> secret value
               </p>
             </div>
 
+            <div className="rounded-lg bg-muted/30 p-4 space-y-3">
+              <h4 className="font-medium text-sm">n8n Workflow Setup (Simple)</h4>
+              <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                <li>Add <strong>Gmail Trigger</strong> node (enable Download Attachments)</li>
+                <li>Add <strong>HTTP Request</strong> node:
+                  <ul className="ml-6 mt-1 space-y-1 list-disc">
+                    <li>Method: <code className="bg-muted px-1 rounded">POST</code></li>
+                    <li>URL: Paste your webhook URL above (with api_key & user_id)</li>
+                    <li>Body: <code className="bg-muted px-1 rounded">Form-Data/Multipart</code></li>
+                    <li>Add parameter: <code className="bg-muted px-1 rounded">file</code> → set to binary attachment</li>
+                  </ul>
+                </li>
+                <li>Connect nodes and activate!</li>
+              </ol>
+            </div>
+
             <div className="space-y-2">
-              <Label>JSON Body Structure</Label>
+              <Label>Alternative: JSON Body</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                If using JSON body instead of form-data:
+              </p>
               <pre className="bg-muted/50 p-3 rounded-lg text-xs font-mono overflow-x-auto">
 {`{
-  "userId": "${user.id}",
   "file_base64": "{{ $binary.attachment_0.data }}",
   "fileName": "{{ $binary.attachment_0.fileName }}"
 }`}
               </pre>
-              <p className="text-xs text-muted-foreground">
-                Use n8n expressions to reference the email attachment binary data
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Alternative: Direct Base64</Label>
-              <pre className="bg-muted/50 p-3 rounded-lg text-xs font-mono overflow-x-auto">
-{`{
-  "userId": "${user.id}",
-  "fileContent": "data:image/jpeg;base64,/9j/4AAQ...",
-  "fileName": "fuel-invoice.jpg"
-}`}
-              </pre>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => copyToClipboard(JSON.stringify({
-                  userId: user.id,
-                  file_base64: "{{ $binary.attachment_0.data }}",
-                  fileName: "{{ $binary.attachment_0.fileName }}"
-                }, null, 2), 'Example payload')}
-              >
-                <Copy className="w-3 h-3" />
-                Copy Example
-              </Button>
             </div>
           </CardContent>
         </Card>
