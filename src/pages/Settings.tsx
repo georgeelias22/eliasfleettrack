@@ -103,7 +103,7 @@ const Settings = () => {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Use this ID for Zapier and other integrations
+                Use this ID for n8n and other integrations
               </p>
             </div>
             <div className="space-y-2">
@@ -121,15 +121,15 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Zapier Integration */}
+        {/* n8n Fuel Invoice Integration */}
         <Card className="border-border/50 bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Webhook className="w-5 h-5 text-amber-500" />
-              Zapier Integration
+              Fuel Invoice Import (n8n)
             </CardTitle>
             <CardDescription>
-              Automatically import fuel invoices from email
+              Automatically import fuel invoices from email using n8n
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -157,30 +157,49 @@ const Settings = () => {
             </div>
 
             <div className="rounded-lg bg-muted/30 p-4 space-y-3">
-              <h4 className="font-medium text-sm">Zapier Setup Instructions</h4>
+              <h4 className="font-medium text-sm">n8n Workflow Setup</h4>
               <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                <li>Create a new Zap with trigger: <strong>Email by Zapier</strong> (or Gmail/Outlook)</li>
-                <li>Add action: <strong>Webhooks by Zapier → POST</strong></li>
-                <li>Set the URL to the webhook URL above</li>
-                <li>Set Payload Type to <strong>json</strong></li>
-                <li>Add these data fields:
+                <li>Add <strong>IMAP Email Read</strong> or <strong>Email Trigger</strong> node</li>
+                <li>Configure to fetch emails with fuel invoice attachments</li>
+                <li>Add an <strong>HTTP Request</strong> node with these settings:
                   <ul className="ml-6 mt-1 space-y-1 list-disc">
-                    <li><code className="bg-muted px-1 rounded">userId</code>: Your User ID (above)</li>
-                    <li><code className="bg-muted px-1 rounded">fileContent</code>: Email attachment (base64)</li>
-                    <li><code className="bg-muted px-1 rounded">fileName</code>: Attachment filename</li>
+                    <li>Method: <code className="bg-muted px-1 rounded">POST</code></li>
+                    <li>URL: <code className="bg-muted px-1 rounded text-xs break-all">{webhookUrl}</code></li>
                   </ul>
                 </li>
-                <li>Turn on the Zap!</li>
+                <li>Add header: <code className="bg-muted px-1 rounded">x-api-key</code> with your API key</li>
+                <li>Set Body Content Type to <strong>JSON</strong></li>
+                <li>Send JSON body with the fields below</li>
               </ol>
             </div>
 
+            <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                <strong>API Key Required:</strong> Set up the <code className="bg-muted px-1 rounded">FUEL_IMPORT_API_KEY</code> secret in your backend settings. Use this same key in the <code className="bg-muted px-1 rounded">x-api-key</code> header.
+              </p>
+            </div>
+
             <div className="space-y-2">
-              <Label>Example JSON Payload</Label>
+              <Label>JSON Body Structure</Label>
               <pre className="bg-muted/50 p-3 rounded-lg text-xs font-mono overflow-x-auto">
 {`{
   "userId": "${user.id}",
-  "fileContent": "data:application/pdf;base64,JVBERi0...",
-  "fileName": "fuel-invoice-2026-01.pdf"
+  "file_base64": "{{ $binary.attachment_0.data }}",
+  "fileName": "{{ $binary.attachment_0.fileName }}"
+}`}
+              </pre>
+              <p className="text-xs text-muted-foreground">
+                Use n8n expressions to reference the email attachment binary data
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Alternative: Direct Base64</Label>
+              <pre className="bg-muted/50 p-3 rounded-lg text-xs font-mono overflow-x-auto">
+{`{
+  "userId": "${user.id}",
+  "fileContent": "data:image/jpeg;base64,/9j/4AAQ...",
+  "fileName": "fuel-invoice.jpg"
 }`}
               </pre>
               <Button
@@ -189,8 +208,8 @@ const Settings = () => {
                 className="gap-2"
                 onClick={() => copyToClipboard(JSON.stringify({
                   userId: user.id,
-                  fileContent: "data:application/pdf;base64,YOUR_BASE64_CONTENT",
-                  fileName: "fuel-invoice.pdf"
+                  file_base64: "{{ $binary.attachment_0.data }}",
+                  fileName: "{{ $binary.attachment_0.fileName }}"
                 }, null, 2), 'Example payload')}
               >
                 <Copy className="w-3 h-3" />

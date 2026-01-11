@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
 };
 
 interface FuelLineItem {
@@ -28,49 +28,74 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication check
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getUser(token);
-    if (claimsError || !claimsData?.user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const authenticatedUserId = claimsData.user.id;
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const expectedApiKey = Deno.env.get("FUEL_IMPORT_API_KEY");
+
+    // Check for API key authentication (for n8n/external services)
+    const apiKey = req.headers.get("x-api-key");
+    const authHeader = req.headers.get("authorization");
+    
+    let userId: string | null = null;
+
+    if (apiKey) {
+      // API key authentication for n8n
+      if (!expectedApiKey || apiKey !== expectedApiKey) {
+        return new Response(
+          JSON.stringify({ error: "Invalid API key" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else if (authHeader?.startsWith("Bearer ")) {
+      // Bearer token authentication (browser)
+      const supabaseClient = createClient(
+        supabaseUrl,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: claimsError } = await supabaseClient.auth.getUser(token);
+      if (claimsError || !claimsData?.user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      userId = claimsData.user.id;
+    } else {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - provide x-api-key header or Bearer token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse the incoming request - Zapier will send form data or JSON
+    // Parse the incoming request - n8n will send form data or JSON
     const contentType = req.headers.get("content-type") || "";
     let fileContent: string | null = null;
-    let fileName = "zapier-invoice";
-    let userId: string | null = null;
+    let fileName = "n8n-invoice";
 
     if (contentType.includes("application/json")) {
       const body = await req.json();
-      fileContent = body.fileContent || body.attachment || body.file_content;
-      fileName = body.fileName || body.file_name || body.filename || "zapier-invoice";
-      userId = body.userId || body.user_id;
+      // Support both base64 and data URL formats
+      const rawContent = body.fileContent || body.attachment || body.file_content || body.file_base64;
+      if (rawContent) {
+        // If it's already a data URL, use as-is; otherwise assume base64 image
+        if (rawContent.startsWith("data:")) {
+          fileContent = rawContent;
+        } else {
+          // Assume it's a base64-encoded image (common for n8n email attachments)
+          fileContent = `data:image/jpeg;base64,${rawContent}`;
+        }
+      }
+      fileName = body.fileName || body.file_name || body.filename || "n8n-invoice";
+      // Allow userId to be passed in body for API key auth
+      if (apiKey && !userId) {
+        userId = body.userId || body.user_id;
+      }
     } else if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
       const file = formData.get("file") as File | null;
@@ -88,26 +113,23 @@ serve(async (req) => {
         fileName = attachment.name;
       }
       
-      userId = formData.get("userId") as string || formData.get("user_id") as string;
+      // Allow userId to be passed in form for API key auth
+      if (apiKey && !userId) {
+        userId = formData.get("userId") as string || formData.get("user_id") as string;
+      }
     }
 
     if (!fileContent) {
       return new Response(
-        JSON.stringify({ error: "No file content provided. Send 'fileContent' or 'attachment' in the request." }),
+        JSON.stringify({ error: "No file content provided. Send 'fileContent', 'file_base64', or 'attachment' in the request." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // If no userId provided, use authenticated user's ID
     if (!userId) {
-      userId = authenticatedUserId;
-    }
-
-    // Verify userId matches authenticated user (prevent accessing other users' data)
-    if (userId !== authenticatedUserId) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized: userId mismatch" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "userId is required when using API key authentication" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
