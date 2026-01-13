@@ -44,6 +44,9 @@ const TIME_PERIODS: { value: TimePeriod; label: string }[] = [
 export function WeeklyFuelMileageChart({ fuelRecords, mileageRecords }: WeeklyFuelMileageChartProps) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('7d');
 
+  // Debug: log what mileage records we receive
+  console.log('WeeklyFuelMileageChart mileageRecords:', mileageRecords.map(r => ({ date: r.record_date, mileage: r.daily_mileage })));
+
   const chartData = useMemo(() => {
     const daysToShow = parseInt(timePeriod);
     const endDate = endOfDay(new Date());
