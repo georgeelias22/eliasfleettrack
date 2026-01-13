@@ -62,13 +62,18 @@ serve(async (req) => {
     const expectedInvoiceDate = parseExpectedInvoiceDate(fileName) || null;
 
     // Keep prompts compact to avoid token blowups.
-    const systemPrompt = `Extract UK fuel card invoice TRANSACTION line items.
+    const systemPrompt = `Extract UK fuel card invoice TRANSACTION line items with VAT-INCLUSIVE totals.
 Rules:
 - Only extract values visible in the document; never guess.
 - Use each row's Date as transactionDate (YYYY-MM-DD).
 - Quantity = litres.
-- PPL is pence: (PPL/100) gives net £/L.
-- Add 20% VAT: costPerLitre=(PPL/100)*1.2, totalCost=(NetAmount)*1.2.
+- IMPORTANT: All costs must be VAT-INCLUSIVE (gross amounts including 20% VAT):
+  - If PPL is shown in pence (net price), convert: costPerLitre = (PPL / 100) * 1.2
+  - If Net Amount is shown, convert: totalCost = NetAmount * 1.2
+  - If Gross/Total Amount with VAT is shown, use that directly.
+  - UK VAT on fuel is 20%, so gross = net * 1.2
+- costPerLitre should be the VAT-inclusive price per litre in pounds.
+- totalCost should be the VAT-inclusive total cost in pounds.
 ${expectedInvoiceDate ? `- Only include transaction dates within ±60 days of ${expectedInvoiceDate}.` : ""}
 ${Array.isArray(vehicleRegistrations) && vehicleRegistrations.length ? `- Registrations to expect: ${vehicleRegistrations.join(", ")}` : ""}`;
 
