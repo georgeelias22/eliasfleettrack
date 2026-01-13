@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,13 +6,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
-import Index from "./pages/Index";
-import VehicleDetail from "./pages/VehicleDetail";
-import Settings from "./pages/Settings";
-import Reports from "./pages/Reports";
-import NotFound from "./pages/NotFound";
+
+// Lazy load page components to reduce initial bundle size
+const Index = lazy(() => import("./pages/Index"));
+const VehicleDetail = lazy(() => import("./pages/VehicleDetail"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Reports = lazy(() => import("./pages/Reports"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
+
+// Simple loading fallback that matches the app's background
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="animate-pulse text-muted-foreground">Loading...</div>
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -21,13 +31,15 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/vehicle/:id" element={<VehicleDetail />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/vehicle/:id" element={<VehicleDetail />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
