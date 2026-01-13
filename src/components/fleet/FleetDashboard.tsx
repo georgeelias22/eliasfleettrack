@@ -106,15 +106,15 @@ export function FleetDashboard() {
         />
       </div>
 
-      {/* Weekly Fuel & Mileage Combined Chart */}
+      {/* Weekly Fuel & Mileage Combined Chart - Prominent Position */}
       <Card className="border-border/50 bg-card">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Activity className="w-4 h-4 text-primary" />
-            Fuel Spend vs Mileage
+            Weekly Fuel Spend vs Mileage
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-2">
           <WeeklyFuelMileageChart 
             fuelRecords={analytics.fuelRecords} 
             mileageRecords={analytics.mileageRecords} 
@@ -122,22 +122,21 @@ export function FleetDashboard() {
         </CardContent>
       </Card>
 
-      {/* Daily Mileage Chart - Full Width */}
-      <Card className="border-border/50 bg-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <CalendarDays className="w-4 h-4 text-emerald-500" />
-            Daily Fleet Mileage
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DailyMileageChart mileageRecords={analytics.mileageRecords} />
-        </CardContent>
-      </Card>
-
       {/* Mileage Charts Row - Hidden on Mobile */}
       <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Mileage Trend Chart */}
+        {/* Daily Mileage Chart - Smaller, in grid */}
+        <Card className="border-border/50 bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <CalendarDays className="w-4 h-4 text-emerald-500" />
+              Daily Fleet Mileage
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DailyMileageChart mileageRecords={analytics.mileageRecords} />
+          </CardContent>
+        </Card>
+        {/* Monthly Mileage Trends */}
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -149,8 +148,10 @@ export function FleetDashboard() {
             <MileageTrendChart data={analytics.mileageByMonth} />
           </CardContent>
         </Card>
+      </div>
 
-        {/* Mileage by Vehicle Chart */}
+      {/* Additional Mileage Chart - Hidden on Mobile */}
+      <div className="hidden md:block">
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
