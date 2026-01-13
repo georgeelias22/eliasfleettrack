@@ -9,5 +9,8 @@ verify_jwt = false
 [functions.import-mileage]
 verify_jwt = false
 
+[functions.import-mileage-excel]
+verify_jwt = false
+
 [functions.scan-fuel-invoice]
 verify_jwt = false
