@@ -97,13 +97,13 @@ Deno.serve(async (req) => {
       const deviceName = row.Device;
       if (!deviceName || deviceName === "Device") continue; // Skip header rows
       
-      // Parse route length (e.g., "415.32 mi" -> 415.32)
+      // Parse route length (e.g., "415.32 mi" -> 415) - rounded to integer
       const routeLengthMatch = row["Route Length"]?.match(/^([\d.]+)/);
-      const dailyMileage = routeLengthMatch ? parseFloat(routeLengthMatch[1]) : 0;
+      const dailyMileage = routeLengthMatch ? Math.round(parseFloat(routeLengthMatch[1])) : 0;
       
       // Parse odometer mileage (e.g., "121723 mi" -> 121723)
       const mileageMatch = row["Mileage"]?.match(/^([\d.]+)/);
-      const odometerReading = mileageMatch ? parseInt(mileageMatch[1]) : null;
+      const odometerReading = mileageMatch ? Math.round(parseFloat(mileageMatch[1])) : null;
       
       // Determine date from "Last Stop" or "First Movement"
       let recordDate: string | null = null;
