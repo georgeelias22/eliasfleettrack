@@ -327,8 +327,8 @@ Deno.serve(async (req) => {
         );
 
       if (upsertError) {
-        console.error("Error upserting mileage:", upsertError);
-        results.push({ vehicle: deviceName, status: "error", error: upsertError.message });
+        console.error("[Mileage Excel Import] Database error:", upsertError);
+        results.push({ vehicle: deviceName, status: "error", error: "Failed to save mileage record" });
       } else {
         results.push({ 
           vehicle: deviceName, 
@@ -350,10 +350,9 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: unknown) {
-    console.error("Error processing Excel file:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Mileage Excel Import] Error processing Excel file:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Failed to process Excel file" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

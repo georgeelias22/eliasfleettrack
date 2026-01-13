@@ -177,9 +177,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (insertError) {
-      console.error('Error inserting mileage record:', insertError);
+      console.error('[Mileage Import] Database error:', insertError);
       return new Response(
-        JSON.stringify({ error: 'Failed to save mileage record', details: insertError.message }),
+        JSON.stringify({ error: 'Failed to save mileage record' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -194,10 +194,9 @@ Deno.serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error processing mileage import:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Mileage Import] Error processing mileage import:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
