@@ -6,6 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
 };
 
+// Input validation constants
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB base64
+const MAX_LITRES = 200;
+const MAX_COST_PER_LITRE = 5;
+const MAX_TOTAL_COST = 1000;
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface FuelLineItem {
   registration?: string;
   litres?: number;
@@ -21,8 +29,36 @@ interface ExtractedFuelData {
   lineItems?: FuelLineItem[];
 }
 
+function validateFuelLineItem(item: FuelLineItem): string[] {
+  const errors: string[] = [];
+  
+  if (item.litres !== undefined) {
+    if (typeof item.litres !== 'number' || isNaN(item.litres) || item.litres < 0 || item.litres > MAX_LITRES) {
+      errors.push(`Invalid litres: ${item.litres} (must be 0-${MAX_LITRES})`);
+    }
+  }
+  
+  if (item.costPerLitre !== undefined) {
+    if (typeof item.costPerLitre !== 'number' || isNaN(item.costPerLitre) || item.costPerLitre < 0 || item.costPerLitre > MAX_COST_PER_LITRE) {
+      errors.push(`Invalid costPerLitre: ${item.costPerLitre} (must be 0-${MAX_COST_PER_LITRE})`);
+    }
+  }
+  
+  if (item.totalCost !== undefined) {
+    if (typeof item.totalCost !== 'number' || isNaN(item.totalCost) || item.totalCost < 0 || item.totalCost > MAX_TOTAL_COST) {
+      errors.push(`Invalid totalCost: ${item.totalCost} (must be 0-${MAX_TOTAL_COST})`);
+    }
+  }
+  
+  return errors;
+}
+
+function sanitizeString(str: string | undefined, maxLength: number): string {
+  if (!str || typeof str !== 'string') return '';
+  return str.slice(0, maxLength).replace(/[<>\"']/g, '');
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -33,27 +69,25 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     const expectedApiKey = Deno.env.get("FUEL_IMPORT_API_KEY");
 
-    // Parse URL parameters for simple webhook usage
     const url = new URL(req.url);
     const urlApiKey = url.searchParams.get("api_key") || url.searchParams.get("key");
     const urlUserId = url.searchParams.get("user_id") || url.searchParams.get("userId");
 
-    // Check for API key authentication (header or URL param)
     const apiKey = req.headers.get("x-api-key") || urlApiKey;
     const authHeader = req.headers.get("authorization");
     
     let userId: string | null = urlUserId;
+    let isApiKeyAuth = false;
 
     if (apiKey) {
-      // API key authentication for n8n/webhooks
       if (!expectedApiKey || apiKey !== expectedApiKey) {
         return new Response(
           JSON.stringify({ error: "Invalid API key" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      isApiKeyAuth = true;
     } else if (authHeader?.startsWith("Bearer ")) {
-      // Bearer token authentication (browser)
       const supabaseClient = createClient(
         supabaseUrl,
         Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -78,27 +112,32 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse the incoming request - n8n will send form data or JSON
     const contentType = req.headers.get("content-type") || "";
     let fileContent: string | null = null;
     let fileName = "n8n-invoice";
 
     if (contentType.includes("application/json")) {
       const body = await req.json();
-      // Support both base64 and data URL formats
       const rawContent = body.fileContent || body.attachment || body.file_content || body.file_base64;
+      
+      // SECURITY FIX: Validate file size
+      if (rawContent && rawContent.length > MAX_FILE_SIZE) {
+        return new Response(
+          JSON.stringify({ error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       if (rawContent) {
-        // If it's already a data URL, use as-is; otherwise assume base64 image
         if (rawContent.startsWith("data:")) {
           fileContent = rawContent;
         } else {
-          // Assume it's a base64-encoded image (common for n8n email attachments)
           fileContent = `data:image/jpeg;base64,${rawContent}`;
         }
       }
-      fileName = body.fileName || body.file_name || body.filename || "n8n-invoice";
-      // Allow userId to be passed in body for API key auth
-      if (apiKey && !userId) {
+      fileName = sanitizeString(body.fileName || body.file_name || body.filename, 255) || "n8n-invoice";
+      
+      if (isApiKeyAuth && !userId) {
         userId = body.userId || body.user_id;
       }
     } else if (contentType.includes("multipart/form-data")) {
@@ -106,20 +145,23 @@ serve(async (req) => {
       const file = formData.get("file") as File | null;
       const attachment = formData.get("attachment") as File | null;
       
-      if (file) {
-        const arrayBuffer = await file.arrayBuffer();
+      const uploadedFile = file || attachment;
+      if (uploadedFile) {
+        // SECURITY FIX: Validate file size
+        if (uploadedFile.size > MAX_FILE_SIZE) {
+          return new Response(
+            JSON.stringify({ error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        const arrayBuffer = await uploadedFile.arrayBuffer();
         const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-        fileContent = `data:${file.type};base64,${base64}`;
-        fileName = file.name;
-      } else if (attachment) {
-        const arrayBuffer = await attachment.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-        fileContent = `data:${attachment.type};base64,${base64}`;
-        fileName = attachment.name;
+        fileContent = `data:${uploadedFile.type};base64,${base64}`;
+        fileName = sanitizeString(uploadedFile.name, 255);
       }
       
-      // Allow userId to be passed in form for API key auth
-      if (apiKey && !userId) {
+      if (isApiKeyAuth && !userId) {
         userId = formData.get("userId") as string || formData.get("user_id") as string;
       }
     }
@@ -138,10 +180,18 @@ serve(async (req) => {
       );
     }
 
-    // Get user's vehicles for registration matching
+    // SECURITY FIX: Validate userId format
+    if (!UUID_REGEX.test(userId)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid userId format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // SECURITY FIX: Verify user exists and fetch only their vehicles
     const { data: vehicles, error: vehiclesError } = await supabase
       .from("vehicles")
-      .select("id, registration")
+      .select("id, registration, user_id")
       .eq("user_id", userId);
 
     if (vehiclesError) {
@@ -152,9 +202,21 @@ serve(async (req) => {
       );
     }
 
-    const vehicleRegistrations = vehicles?.map((v) => v.registration) || [];
+    if (!vehicles || vehicles.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "No vehicles found for this user. Please add vehicles first.",
+          createdRecords: [],
+          failedRecords: [],
+          skippedDuplicates: []
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    // Call AI to extract fuel data
+    const vehicleRegistrations = vehicles.map((v) => v.registration);
+
     if (!lovableApiKey) {
       return new Response(
         JSON.stringify({ error: "AI processing not configured" }),
@@ -172,9 +234,11 @@ Extract:
 - lineItems: Array of fuel purchases, each with:
   - registration: Vehicle registration (match to known registrations if possible)
   - litres: Amount of fuel in litres
-  - costPerLitre: Price per litre
-  - totalCost: Total cost for this line
+  - costPerLitre: Price per litre (VAT-inclusive)
+  - totalCost: Total cost for this line (VAT-inclusive)
   - mileage: Vehicle mileage if shown
+
+IMPORTANT: All costs must be VAT-inclusive (gross amounts including 20% VAT).
 
 Return structured JSON data.`;
 
@@ -192,7 +256,7 @@ Return structured JSON data.`;
         ]
       : [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Extract fuel data from this invoice:\n\nFile: ${fileName}\n\nContent:\n${fileContent}` },
+          { role: "user", content: `Extract fuel data from this invoice:\n\nFile: ${fileName}\n\nContent:\n${fileContent.slice(0, 50000)}` },
         ];
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -250,7 +314,6 @@ Return structured JSON data.`;
     const aiData = await aiResponse.json();
     let extractedData: ExtractedFuelData | null = null;
 
-    // Parse AI response
     const toolCalls = aiData.choices?.[0]?.message?.tool_calls;
     if (toolCalls && toolCalls.length > 0) {
       try {
@@ -271,31 +334,67 @@ Return structured JSON data.`;
       );
     }
 
-    // Match registrations to vehicle IDs and create fuel records
+    // SECURITY FIX: Validate invoice date
+    let invoiceDate = extractedData.invoiceDate;
+    if (invoiceDate) {
+      if (!DATE_REGEX.test(invoiceDate)) {
+        invoiceDate = new Date().toISOString().split("T")[0];
+      } else {
+        const date = new Date(invoiceDate);
+        const now = new Date();
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        
+        if (isNaN(date.getTime()) || date > now || date < oneYearAgo) {
+          invoiceDate = new Date().toISOString().split("T")[0];
+        }
+      }
+    } else {
+      invoiceDate = new Date().toISOString().split("T")[0];
+    }
+
     const createdRecords: any[] = [];
     const failedRecords: any[] = [];
     const skippedDuplicates: any[] = [];
 
     for (const item of extractedData.lineItems) {
-      // Try to match registration
+      // SECURITY FIX: Validate each line item
+      const itemErrors = validateFuelLineItem(item);
+      if (itemErrors.length > 0) {
+        failedRecords.push({
+          ...item,
+          reason: `Validation errors: ${itemErrors.join("; ")}`,
+        });
+        continue;
+      }
+
       const normalizedReg = item.registration?.replace(/\s+/g, "").toUpperCase() || "";
-      const matchedVehicle = vehicles?.find(
+      const matchedVehicle = vehicles.find(
         (v) => v.registration.replace(/\s+/g, "").toUpperCase() === normalizedReg
       );
 
       if (!matchedVehicle) {
         failedRecords.push({
           ...item,
-          reason: `Vehicle registration "${item.registration}" not found in fleet`,
+          reason: `Vehicle registration "${item.registration}" not found in user's fleet`,
         });
         continue;
       }
 
-      const fillDate = extractedData.invoiceDate || new Date().toISOString().split("T")[0];
+      // SECURITY FIX: Double-check ownership
+      if (matchedVehicle.user_id !== userId) {
+        failedRecords.push({
+          ...item,
+          reason: `Vehicle does not belong to user`,
+        });
+        continue;
+      }
+
+      const fillDate = invoiceDate;
       const litres = item.litres || 0;
       const totalCost = item.totalCost || (item.litres || 0) * (item.costPerLitre || 0);
 
-      // Check for duplicate: same vehicle, same date, similar litres or cost
+      // Check for duplicate
       const { data: existingRecords } = await supabase
         .from("fuel_records")
         .select("id, litres, total_cost")
@@ -303,7 +402,6 @@ Return structured JSON data.`;
         .eq("fill_date", fillDate);
 
       const isDuplicate = existingRecords?.some((record) => {
-        // Consider it a duplicate if litres match within 0.5L or total cost matches within £1
         const litresDiff = Math.abs(record.litres - litres);
         const costDiff = Math.abs(record.total_cost - totalCost);
         return litresDiff < 0.5 || costDiff < 1;
@@ -317,7 +415,6 @@ Return structured JSON data.`;
         continue;
       }
 
-      // Create fuel record
       const { data: fuelRecord, error: insertError } = await supabase
         .from("fuel_records")
         .insert({
@@ -327,8 +424,8 @@ Return structured JSON data.`;
           cost_per_litre: item.costPerLitre || 0,
           total_cost: totalCost,
           mileage: item.mileage || null,
-          station: extractedData.station || null,
-          notes: `Auto-imported from email: ${fileName}`,
+          station: sanitizeString(extractedData.station, 255) || null,
+          notes: `Auto-imported from email: ${sanitizeString(fileName, 100)}`,
         })
         .select()
         .single();
