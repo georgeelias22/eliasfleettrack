@@ -210,7 +210,7 @@ ${Array.isArray(vehicleRegistrations) && vehicleRegistrations.length ? `- Regist
       });
     }
 
-    console.error("Error processing fuel invoice:", error);
-    return json(500, { error: "Failed to analyze fuel invoice", details: message });
+    console.error("[Fuel Invoice] Error processing fuel invoice:", error);
+    return json(500, { error: "Failed to analyze fuel invoice" });
   }
 });

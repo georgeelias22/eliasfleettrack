@@ -431,10 +431,10 @@ Return structured JSON data.`;
         .single();
 
       if (insertError) {
-        console.error("Failed to insert fuel record:", insertError);
+        console.error("[Fuel Email] Failed to insert fuel record:", insertError);
         failedRecords.push({
           ...item,
-          reason: `Database error: ${insertError.message}`,
+          reason: "Failed to save fuel record",
         });
       } else {
         createdRecords.push(fuelRecord);
@@ -453,10 +453,9 @@ Return structured JSON data.`;
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
-    console.error("Error processing fuel email:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    console.error("[Fuel Email] Error processing fuel email:", error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Failed to process fuel email" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
