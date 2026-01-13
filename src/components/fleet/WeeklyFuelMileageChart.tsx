@@ -11,7 +11,7 @@ import {
   Legend
 } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, subDays, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
+import { format, subWeeks, startOfWeek, endOfWeek, eachWeekOfInterval, isWithinInterval, parseISO } from 'date-fns';
 
 interface FuelRecord {
   id: string;
@@ -33,44 +33,48 @@ interface WeeklyFuelMileageChartProps {
   mileageRecords: MileageRecord[];
 }
 
-type TimePeriod = '7d' | '14d' | '30d';
+type TimePeriod = '4w' | '8w' | '12w';
 
 const TIME_PERIODS: { value: TimePeriod; label: string }[] = [
-  { value: '7d', label: 'Last 7 Days' },
-  { value: '14d', label: 'Last 14 Days' },
-  { value: '30d', label: 'Last 30 Days' },
+  { value: '4w', label: 'Last 4 Weeks' },
+  { value: '8w', label: 'Last 8 Weeks' },
+  { value: '12w', label: 'Last 12 Weeks' },
 ];
 
 export function WeeklyFuelMileageChart({ fuelRecords, mileageRecords }: WeeklyFuelMileageChartProps) {
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('7d');
-
-  // Debug: log what mileage records we receive
-  console.log('WeeklyFuelMileageChart mileageRecords:', mileageRecords.map(r => ({ date: r.record_date, mileage: r.daily_mileage })));
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('4w');
 
   const chartData = useMemo(() => {
-    const daysToShow = parseInt(timePeriod);
-    const endDate = endOfDay(new Date());
-    const startDate = startOfDay(subDays(endDate, daysToShow - 1));
+    const weeksToShow = parseInt(timePeriod);
+    const endDate = endOfWeek(new Date(), { weekStartsOn: 1 });
+    const startDate = startOfWeek(subWeeks(endDate, weeksToShow - 1), { weekStartsOn: 1 });
 
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
 
-    return days.map(day => {
-      const dayStr = format(day, 'yyyy-MM-dd');
-      const displayDate = format(day, 'EEE dd');
+    return weeks.map(weekStart => {
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+      const weekLabel = `${format(weekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM')}`;
+      const shortLabel = format(weekStart, 'dd/MM');
 
-      // Sum fuel costs for this day
+      // Sum fuel costs for this week
       const fuelCost = fuelRecords
-        .filter(r => r.fill_date === dayStr)
+        .filter(r => {
+          const fillDate = parseISO(r.fill_date);
+          return isWithinInterval(fillDate, { start: weekStart, end: weekEnd });
+        })
         .reduce((sum, r) => sum + r.total_cost, 0);
 
-      // Sum mileage for this day
+      // Sum mileage for this week
       const mileage = mileageRecords
-        .filter(r => r.record_date === dayStr)
+        .filter(r => {
+          const recordDate = parseISO(r.record_date);
+          return isWithinInterval(recordDate, { start: weekStart, end: weekEnd });
+        })
         .reduce((sum, r) => sum + r.daily_mileage, 0);
 
       return {
-        date: dayStr,
-        displayDate,
+        weekLabel,
+        shortLabel,
         fuelCost: Math.round(fuelCost * 100) / 100,
         mileage: Math.round(mileage),
       };
@@ -112,7 +116,7 @@ export function WeeklyFuelMileageChart({ fuelRecords, mileageRecords }: WeeklyFu
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis
-                dataKey="displayDate"
+                dataKey="shortLabel"
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
                 tickLine={false}
@@ -143,6 +147,7 @@ export function WeeklyFuelMileageChart({ fuelRecords, mileageRecords }: WeeklyFu
                   boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                 }}
                 labelStyle={{ color: 'hsl(var(--foreground))' }}
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.weekLabel || ''}
                 formatter={(value: number, name: string) => {
                   if (name === 'fuelCost')
                     return [`£${value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`, 'Fuel Spend'];
@@ -165,7 +170,7 @@ export function WeeklyFuelMileageChart({ fuelRecords, mileageRecords }: WeeklyFu
                 dataKey="fuelCost"
                 fill="url(#fuelBarGradient)"
                 radius={[4, 4, 0, 0]}
-                maxBarSize={40}
+                maxBarSize={50}
               />
               <Line
                 yAxisId="mileage"
