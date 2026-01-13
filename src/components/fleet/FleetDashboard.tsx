@@ -12,7 +12,8 @@ import {
   BarChart3,
   FileText,
   Car,
-  Route
+  Route,
+  Activity
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
 import { CostByVehicleChart } from './CostByVehicleChart';
@@ -21,6 +22,7 @@ import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
 import { MileageTrendChart } from './MileageTrendChart';
 import { MileageByVehicleChart } from './MileageByVehicleChart';
 import { DailyMileageChart } from './DailyMileageChart';
+import { WeeklyFuelMileageChart } from './WeeklyFuelMileageChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
 import { TwelveMonthSummary } from './TwelveMonthSummary';
 import { AddFuelInvoiceDialog } from './AddFuelInvoiceDialog';
@@ -103,6 +105,22 @@ export function FleetDashboard() {
           avgDailyMileage={analytics.avgDailyMileage}
         />
       </div>
+
+      {/* Weekly Fuel & Mileage Combined Chart */}
+      <Card className="border-border/50 bg-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Activity className="w-4 h-4 text-primary" />
+            Fuel Spend vs Mileage
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <WeeklyFuelMileageChart 
+            fuelRecords={analytics.fuelRecords} 
+            mileageRecords={analytics.mileageRecords} 
+          />
+        </CardContent>
+      </Card>
 
       {/* Daily Mileage Chart - Full Width */}
       <Card className="border-border/50 bg-card">
