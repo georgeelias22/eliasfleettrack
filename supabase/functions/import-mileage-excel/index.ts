@@ -15,6 +15,53 @@ interface VehicleRow {
   "Last Stop": string;
 }
 
+// Simple Levenshtein distance for fuzzy matching
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+  
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+  
+  return matrix[b.length][a.length];
+}
+
+// Check if two strings are similar (allowing for typos)
+function isSimilar(str1: string, str2: string, maxDistance = 2): boolean {
+  const s1 = str1.toLowerCase().trim();
+  const s2 = str2.toLowerCase().trim();
+  
+  // Exact match
+  if (s1 === s2) return true;
+  
+  // One contains the other
+  if (s1.includes(s2) || s2.includes(s1)) return true;
+  
+  // Levenshtein distance for short strings
+  if (Math.abs(s1.length - s2.length) <= maxDistance) {
+    return levenshteinDistance(s1, s2) <= maxDistance;
+  }
+  
+  return false;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -127,11 +174,10 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Find vehicle by name (make + model match or partial match)
+      // Find all vehicles to do fuzzy matching
       const { data: vehicles, error: vehicleError } = await serviceClient
         .from("vehicles")
-        .select("id, registration, make, model")
-        .or(`make.ilike.%${deviceName.split(" ")[0]}%,model.ilike.%${deviceName}%`);
+        .select("id, registration, make, model");
 
       if (vehicleError) {
         console.error("Error finding vehicle:", vehicleError);
@@ -139,20 +185,44 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Try to find a matching vehicle
+      // Parse device name into words for matching
+      const deviceWords = deviceName.toLowerCase().split(/\s+/);
+      
+      // Try to find a matching vehicle with fuzzy matching
       let matchedVehicle = vehicles?.find(v => {
-        const fullName = `${v.make} ${v.model}`.toLowerCase();
-        return fullName.includes(deviceName.toLowerCase()) || 
-               deviceName.toLowerCase().includes(fullName);
+        const make = v.make?.toLowerCase() || "";
+        const model = v.model?.toLowerCase() || "";
+        const fullName = `${make} ${model}`;
+        
+        // Exact match on full name
+        if (fullName === deviceName.toLowerCase()) return true;
+        
+        // Check if device name contains make+model or vice versa
+        if (fullName.includes(deviceName.toLowerCase()) || 
+            deviceName.toLowerCase().includes(fullName)) return true;
+        
+        // Fuzzy match: check each word against make/model with typo tolerance
+        const makeMatches = deviceWords.some(word => isSimilar(word, make));
+        const modelMatches = deviceWords.some(word => isSimilar(word, model));
+        
+        // If both make and model have fuzzy matches, it's a match
+        if (makeMatches && modelMatches) return true;
+        
+        // Check if any word is similar to make and another to model
+        for (const word of deviceWords) {
+          if (isSimilar(word, make, 2)) {
+            // Found make match, now check if any other word matches model
+            const modelWords = model.split(/\s+/);
+            for (const mWord of modelWords) {
+              if (deviceWords.some(dw => dw !== word && isSimilar(dw, mWord, 2))) {
+                return true;
+              }
+            }
+          }
+        }
+        
+        return false;
       });
-
-      if (!matchedVehicle && vehicles && vehicles.length > 0) {
-        // Fuzzy match: check if device name contains make or model
-        matchedVehicle = vehicles.find(v => 
-          deviceName.toLowerCase().includes(v.make?.toLowerCase() || "") ||
-          deviceName.toLowerCase().includes(v.model?.toLowerCase() || "")
-        );
-      }
 
       if (!matchedVehicle) {
         results.push({ vehicle: deviceName, status: "not_found", error: "No matching vehicle in system" });
