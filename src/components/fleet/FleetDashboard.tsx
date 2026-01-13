@@ -20,11 +20,13 @@ import { FuelTrendChart } from './FuelTrendChart';
 import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
 import { MileageTrendChart } from './MileageTrendChart';
 import { MileageByVehicleChart } from './MileageByVehicleChart';
+import { DailyMileageChart } from './DailyMileageChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
 import { TwelveMonthSummary } from './TwelveMonthSummary';
 import { AddFuelInvoiceDialog } from './AddFuelInvoiceDialog';
 import { AddVehicleDialog } from './AddVehicleDialog';
 import { CombinedRemindersWidget } from './CombinedRemindersWidget';
+import { CalendarDays } from 'lucide-react';
 
 export function FleetDashboard() {
   const { data: analytics, isLoading, error } = useFleetAnalytics();
@@ -102,6 +104,19 @@ export function FleetDashboard() {
         />
       </div>
 
+      {/* Daily Mileage Chart - Full Width */}
+      <Card className="border-border/50 bg-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <CalendarDays className="w-4 h-4 text-emerald-500" />
+            Daily Fleet Mileage
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DailyMileageChart mileageRecords={analytics.mileageRecords} />
+        </CardContent>
+      </Card>
+
       {/* Mileage Charts Row - Hidden on Mobile */}
       <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Mileage Trend Chart */}
@@ -109,7 +124,7 @@ export function FleetDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Route className="w-4 h-4 text-emerald-500" />
-              Mileage Trends
+              Monthly Mileage Trends
             </CardTitle>
           </CardHeader>
           <CardContent>
