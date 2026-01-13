@@ -11,12 +11,15 @@ import {
   Receipt,
   BarChart3,
   FileText,
-  Car
+  Car,
+  Route
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
 import { CostByVehicleChart } from './CostByVehicleChart';
 import { FuelTrendChart } from './FuelTrendChart';
 import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
+import { MileageTrendChart } from './MileageTrendChart';
+import { MileageByVehicleChart } from './MileageByVehicleChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
 import { TwelveMonthSummary } from './TwelveMonthSummary';
 import { AddFuelInvoiceDialog } from './AddFuelInvoiceDialog';
@@ -94,7 +97,38 @@ export function FleetDashboard() {
           avgCostPerLitre={analytics.avgCostPerLitre}
           motDueSoon={analytics.motStats.dueSoon}
           motOverdue={analytics.motStats.overdue}
+          totalMileage={analytics.totalMileage}
+          avgDailyMileage={analytics.avgDailyMileage}
         />
+      </div>
+
+      {/* Mileage Charts Row - Hidden on Mobile */}
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Mileage Trend Chart */}
+        <Card className="border-border/50 bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Route className="w-4 h-4 text-emerald-500" />
+              Mileage Trends
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MileageTrendChart data={analytics.mileageByMonth} />
+          </CardContent>
+        </Card>
+
+        {/* Mileage by Vehicle Chart */}
+        <Card className="border-border/50 bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <BarChart3 className="w-4 h-4 text-teal-500" />
+              Mileage by Vehicle
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MileageByVehicleChart mileageRecords={analytics.mileageRecords} vehicles={vehicles} />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Fuel Charts Row - Hidden on Mobile */}

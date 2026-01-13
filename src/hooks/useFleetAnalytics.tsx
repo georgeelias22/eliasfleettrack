@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Vehicle, ServiceRecord, Document, getMOTStatus, getDaysUntilMOT } from '@/types/fleet';
 import { FuelRecord } from '@/types/fuel';
+import { MileageRecord } from '@/hooks/useMileageRecords';
 
 export interface FleetAnalytics {
   totalVehicles: number;
@@ -12,6 +13,11 @@ export interface FleetAnalytics {
   avgCostPerLitre: number;
   totalTaxCost: number;
   totalFinanceCost: number;
+  // Mileage stats
+  totalMileage: number;
+  avgDailyMileage: number;
+  mileageByMonth: { month: string; monthKey: string; totalMileage: number; avgDailyMileage: number; recordCount: number }[];
+  mileageRecords: MileageRecord[];
   costByVehicle: { vehicleId: string; registration: string; make: string; model: string; cost: number; fuelCost: number; financeCost: number }[];
   costByMonth: { month: string; monthKey: string; cost: number; fuelCost: number; financeCost: number; taxCost: number }[];
   fuelByMonth: { month: string; monthKey: string; fuelCost: number; litres: number; avgCostPerLitre: number; fillCount: number }[];
@@ -61,10 +67,19 @@ export function useFleetAnalytics() {
       
       if (fuelError) throw fuelError;
 
+      // Fetch all mileage records
+      const { data: mileageRecords, error: mileageError } = await supabase
+        .from('mileage_records')
+        .select('*')
+        .order('record_date', { ascending: false });
+      
+      if (mileageError) throw mileageError;
+
       const typedVehicles = vehicles as Vehicle[];
       const typedRecords = serviceRecords as ServiceRecord[];
       const typedDocs = documents as Document[];
       const typedFuel = fuelRecords as FuelRecord[];
+      const typedMileage = mileageRecords as MileageRecord[];
 
       // Filter active vehicles for tax/finance calculations
       const activeVehicles = typedVehicles.filter(v => v.is_active !== false);
@@ -186,6 +201,34 @@ export function useFleetAnalytics() {
         });
       }
 
+      // Mileage by month (last 12 months)
+      const mileageByMonth: { month: string; monthKey: string; totalMileage: number; avgDailyMileage: number; recordCount: number }[] = [];
+      
+      for (let i = 11; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const year = monthDate.getFullYear();
+        const month = String(monthDate.getMonth() + 1).padStart(2, '0');
+        const monthKey = `${year}-${month}`;
+        const monthLabel = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        
+        const monthMileageRecords = typedMileage.filter(m => m.record_date.startsWith(monthKey));
+        const monthTotalMileage = monthMileageRecords.reduce((sum, m) => sum + m.daily_mileage, 0);
+        const monthRecordCount = monthMileageRecords.length;
+        const monthAvgDailyMileage = monthRecordCount > 0 ? monthTotalMileage / monthRecordCount : 0;
+        
+        mileageByMonth.push({
+          month: monthLabel,
+          monthKey: monthKey,
+          totalMileage: Math.round(monthTotalMileage),
+          avgDailyMileage: Math.round(monthAvgDailyMileage * 10) / 10,
+          recordCount: monthRecordCount,
+        });
+      }
+
+      // Total mileage stats (last 12 months)
+      const totalMileage = typedMileage.reduce((sum, m) => sum + m.daily_mileage, 0);
+      const avgDailyMileage = typedMileage.length > 0 ? totalMileage / typedMileage.length : 0;
+
       // MOT analysis - only for active vehicles
       const motStats = { valid: 0, dueSoon: 0, overdue: 0, unknown: 0 };
       const upcomingMOTs: { vehicle: Vehicle; daysUntil: number }[] = [];
@@ -240,6 +283,11 @@ export function useFleetAnalytics() {
         avgCostPerLitre,
         totalTaxCost,
         totalFinanceCost,
+        // Mileage stats
+        totalMileage,
+        avgDailyMileage: Math.round(avgDailyMileage * 10) / 10,
+        mileageByMonth,
+        mileageRecords: typedMileage,
         costByVehicle,
         costByMonth,
         fuelByMonth,

@@ -1,5 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Fuel, Wrench, PoundSterling, Car, TrendingUp, Calendar, Droplets, AlertTriangle, Clock } from 'lucide-react';
+import { Fuel, Wrench, PoundSterling, Car, TrendingUp, Calendar, Droplets, AlertTriangle, Clock, Gauge, Route } from 'lucide-react';
 
 interface TwelveMonthSummaryProps {
   totalCost: number;
@@ -12,6 +12,8 @@ interface TwelveMonthSummaryProps {
   avgCostPerLitre: number;
   motDueSoon: number;
   motOverdue: number;
+  totalMileage: number;
+  avgDailyMileage: number;
 }
 
 export function TwelveMonthSummary({ 
@@ -25,6 +27,8 @@ export function TwelveMonthSummary({
   avgCostPerLitre,
   motDueSoon,
   motOverdue,
+  totalMileage,
+  avgDailyMileage,
 }: TwelveMonthSummaryProps) {
   const formatCurrency = (value: number) => 
     `£${value.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -36,6 +40,8 @@ export function TwelveMonthSummary({
   const items = [
     { label: 'Total Fleet Cost', value: formatCurrency(totalCost), icon: TrendingUp, color: 'text-primary', bgColor: 'bg-primary/10' },
     { label: 'Avg Cost/Vehicle', value: formatCurrency(avgCostPerVehicle), icon: Car, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10' },
+    { label: 'Total Miles', value: totalMileage.toLocaleString('en-GB'), icon: Route, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' },
+    { label: 'Avg Mi/Day', value: avgDailyMileage.toLocaleString('en-GB', { maximumFractionDigits: 1 }), icon: Gauge, color: 'text-teal-500', bgColor: 'bg-teal-500/10' },
     { label: 'Fuel', value: formatCurrency(fuelCost), icon: Fuel, color: 'text-amber-500', bgColor: 'bg-amber-500/10' },
     { label: 'Service & Repairs', value: formatCurrency(serviceCost), icon: Wrench, color: 'text-sky-500', bgColor: 'bg-sky-500/10' },
     { label: 'Finance', value: formatCurrency(financeCost), icon: PoundSterling, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' },
@@ -49,7 +55,7 @@ export function TwelveMonthSummary({
   return (
     <Card className="border-border/50 bg-card overflow-hidden">
       <CardContent className="p-0">
-        <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-9 divide-x divide-y lg:divide-y-0 divide-border/50">
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-12 divide-x divide-y lg:divide-y-0 divide-border/50">
           {items.map((item) => (
             <div key={item.label} className="p-4 flex flex-col items-center text-center gap-2">
               <div className={`p-2 rounded-lg ${item.bgColor}`}>
