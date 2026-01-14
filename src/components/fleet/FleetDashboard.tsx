@@ -11,24 +11,17 @@ import {
   Receipt,
   BarChart3,
   FileText,
-  Car,
-  Route,
-  Activity
+  Car
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
 import { CostByVehicleChart } from './CostByVehicleChart';
 import { FuelTrendChart } from './FuelTrendChart';
 import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
-import { MileageTrendChart } from './MileageTrendChart';
-import { MileageByVehicleChart } from './MileageByVehicleChart';
-import { DailyMileageChart } from './DailyMileageChart';
-import { WeeklyFuelMileageChart } from './WeeklyFuelMileageChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
 import { TwelveMonthSummary } from './TwelveMonthSummary';
 import { AddFuelInvoiceDialog } from './AddFuelInvoiceDialog';
 import { AddVehicleDialog } from './AddVehicleDialog';
 import { CombinedRemindersWidget } from './CombinedRemindersWidget';
-import { CalendarDays } from 'lucide-react';
 
 export function FleetDashboard() {
   const { data: analytics, isLoading, error } = useFleetAnalytics();
@@ -101,68 +94,7 @@ export function FleetDashboard() {
           avgCostPerLitre={analytics.avgCostPerLitre}
           motDueSoon={analytics.motStats.dueSoon}
           motOverdue={analytics.motStats.overdue}
-          totalMileage={analytics.totalMileage}
-          avgDailyMileage={analytics.avgDailyMileage}
         />
-      </div>
-
-      {/* Weekly Fuel & Mileage Combined Chart - Prominent Position */}
-      <Card className="border-border/50 bg-card">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Activity className="w-4 h-4 text-primary" />
-            Weekly Fuel Spend vs Mileage
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <WeeklyFuelMileageChart 
-            fuelRecords={analytics.fuelRecords} 
-            mileageRecords={analytics.mileageRecords} 
-          />
-        </CardContent>
-      </Card>
-
-      {/* Mileage Charts Row - Hidden on Mobile */}
-      <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Mileage Chart - Smaller, in grid */}
-        <Card className="border-border/50 bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <CalendarDays className="w-4 h-4 text-emerald-500" />
-              Daily Fleet Mileage
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DailyMileageChart mileageRecords={analytics.mileageRecords} />
-          </CardContent>
-        </Card>
-        {/* Monthly Mileage Trends */}
-        <Card className="border-border/50 bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Route className="w-4 h-4 text-emerald-500" />
-              Monthly Mileage Trends
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MileageTrendChart data={analytics.mileageByMonth} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Additional Mileage Chart - Hidden on Mobile */}
-      <div className="hidden md:block">
-        <Card className="border-border/50 bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <BarChart3 className="w-4 h-4 text-teal-500" />
-              Mileage by Vehicle
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MileageByVehicleChart mileageRecords={analytics.mileageRecords} vehicles={vehicles} />
-          </CardContent>
-        </Card>
       </div>
 
       {/* Fuel Charts Row - Hidden on Mobile */}

@@ -10,7 +10,6 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Copy, User, Webhook, Truck, Check, Users, Wrench, Settings as SettingsIcon } from 'lucide-react';
 import { useState } from 'react';
-import { MileageImportSettings } from '@/components/fleet/MileageImportSettings';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { DriverList } from '@/components/drivers/DriverList';
 import { MaintenanceScheduleList } from '@/components/maintenance/MaintenanceScheduleList';
@@ -267,9 +266,6 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Mileage Import */}
-            <MileageImportSettings />
           </TabsContent>
 
           {/* Admin Tab */}
