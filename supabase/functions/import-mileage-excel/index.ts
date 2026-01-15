@@ -82,10 +82,10 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user's vehicles to map registrations to vehicle IDs
+    // Get user's vehicles to map registrations AND make/model to vehicle IDs
     const { data: vehicles, error: vehiclesError } = await supabase
       .from("vehicles")
-      .select("id, registration")
+      .select("id, registration, make, model")
       .eq("user_id", userId);
 
     if (vehiclesError) {
@@ -96,12 +96,79 @@ serve(async (req) => {
       );
     }
 
-    // Create a map of registration to vehicle ID (case-insensitive, no spaces)
-    const vehicleMap = new Map<string, string>();
+    // Create maps for matching vehicles
+    const vehicleMap = new Map<string, string>(); // registration -> id
+    const vehicleMakeModelMap = new Map<string, string>(); // "make model" -> id
+    
     vehicles?.forEach((v) => {
+      // Map by registration (case-insensitive, no spaces)
       const normalizedReg = v.registration.replace(/\s+/g, "").toUpperCase();
       vehicleMap.set(normalizedReg, v.id);
+      
+      // Map by make + model combination for fuzzy matching
+      if (v.make && v.model) {
+        const makeModel = `${v.make} ${v.model}`.replace(/\s+/g, " ").toUpperCase().trim();
+        vehicleMakeModelMap.set(makeModel, v.id);
+      }
     });
+    
+    console.log("Vehicle make/models:", Array.from(vehicleMakeModelMap.keys()).join(", "));
+    
+    // Helper function to find vehicle by device name using fuzzy matching
+    function findVehicleByDeviceName(deviceName: string): string | undefined {
+      const normalizedDevice = deviceName.replace(/\s+/g, "").toUpperCase();
+      const deviceWords = deviceName.toUpperCase().split(/\s+/).filter(w => w.length > 1);
+      
+      // 1. Check if device name IS a registration
+      let vehicleId = vehicleMap.get(normalizedDevice);
+      if (vehicleId) return vehicleId;
+      
+      // 2. Check if registration is contained in device name
+      for (const [reg, id] of vehicleMap.entries()) {
+        if (normalizedDevice.includes(reg) || reg.includes(normalizedDevice)) {
+          return id;
+        }
+      }
+      
+      // 3. Match against make + model (fuzzy)
+      for (const [makeModel, id] of vehicleMakeModelMap.entries()) {
+        const makeModelNormalized = makeModel.replace(/\s+/g, "");
+        const makeModelWords = makeModel.split(/\s+/);
+        
+        // Exact match on make+model
+        if (normalizedDevice === makeModelNormalized) {
+          return id;
+        }
+        
+        // Check if device contains make+model or vice versa
+        if (normalizedDevice.includes(makeModelNormalized) || makeModelNormalized.includes(normalizedDevice)) {
+          return id;
+        }
+        
+        // Check if all make/model words appear in device name
+        const allWordsMatch = makeModelWords.every(word => 
+          deviceWords.some(dw => dw.includes(word) || word.includes(dw))
+        );
+        if (allWordsMatch && makeModelWords.length >= 2) {
+          return id;
+        }
+        
+        // Check if device starts with make and contains part of model
+        const makeWord = makeModelWords[0];
+        if (deviceWords[0] === makeWord) {
+          // First word matches make, check if any model word matches
+          const modelWords = makeModelWords.slice(1);
+          const hasModelMatch = modelWords.some(mw => 
+            deviceWords.some(dw => dw.includes(mw) || mw.includes(dw))
+          );
+          if (hasModelMatch) {
+            return id;
+          }
+        }
+      }
+      
+      return undefined;
+    }
 
     let rows: Record<string, unknown>[] = [];
     let dateColumn = dateColumnParam;
@@ -288,31 +355,16 @@ serve(async (req) => {
             continue;
           }
 
-          // Match device name to vehicle registration
-          // Try exact match first, then fuzzy match
-          let vehicleId: string | undefined;
-          
-          // Normalize device name for matching
-          const normalizedDevice = deviceName.replace(/\s+/g, "").toUpperCase();
-          
-          // Check if device name IS a registration
-          vehicleId = vehicleMap.get(normalizedDevice);
-          
-          // If not, try to find a vehicle whose registration is contained in the device name
-          if (!vehicleId) {
-            for (const [reg, id] of vehicleMap.entries()) {
-              if (normalizedDevice.includes(reg) || reg.includes(normalizedDevice)) {
-                vehicleId = id;
-                break;
-              }
-            }
-          }
+          // Match device name to vehicle using fuzzy matching (registration or make/model)
+          const vehicleId = findVehicleByDeviceName(deviceName);
           
           if (!vehicleId) {
             console.log(`No matching vehicle for device: ${deviceName}`);
             results.skipped++;
             continue;
           }
+          
+          console.log(`Matched device "${deviceName}" to vehicle ID ${vehicleId}`);
 
           const mileageValue = rowData[mileageCol];
           // Handle "Route Length" format like "123.45 km" or just a number
