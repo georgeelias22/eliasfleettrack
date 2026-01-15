@@ -222,10 +222,37 @@ serve(async (req) => {
       errors: [] as string[],
     };
 
-    // Check for "Vehicle Report" format: Device column + Mileage column, date from filename
-    const deviceCol = columnMapping["device"] || columnNames.find(c => c.toLowerCase().includes("device"));
-    const mileageCol = columnMapping["mileage"] || columnMapping["route length"] || 
-                       columnNames.find(c => c.toLowerCase().includes("mileage"));
+    // Check for "Vehicle Report" format: Device column + Mileage/Route Length column
+    // The columnMapping maps lowercase header names to actual Excel column keys
+    // e.g., columnMapping["device"] = "Vehicle Information" (the actual key in the row data)
+    
+    console.log("Column mapping keys:", Object.keys(columnMapping));
+    
+    // Find device column - check mapping first, then fall back to column names
+    let deviceCol: string | undefined = columnMapping["device"];
+    if (!deviceCol) {
+      deviceCol = columnNames.find(c => c.toLowerCase().includes("device"));
+    }
+    
+    // Find mileage column - check mapping for various names
+    let mileageCol: string | undefined = columnMapping["mileage"] || 
+                                          columnMapping["route length"] ||
+                                          columnMapping["total mileage"] ||
+                                          columnMapping["distance"];
+    if (!mileageCol) {
+      // Also check for __EMPTY columns that might contain mileage
+      for (const [header, colKey] of Object.entries(columnMapping)) {
+        if (header.includes("mileage") || header.includes("route") || header.includes("distance")) {
+          mileageCol = colKey;
+          break;
+        }
+      }
+    }
+    if (!mileageCol) {
+      mileageCol = columnNames.find(c => c.toLowerCase().includes("mileage"));
+    }
+    
+    console.log(`Device column: ${deviceCol}, Mileage column: ${mileageCol}`);
     
     // Try to extract date from filename embedded in request URL or use today
     let reportDate = new Date().toISOString().split("T")[0];
