@@ -114,6 +114,29 @@ serve(async (req) => {
     
     console.log("Vehicle make/models:", Array.from(vehicleMakeModelMap.keys()).join(", "));
     
+    // Simple Levenshtein distance for fuzzy string matching
+    function levenshtein(a: string, b: string): number {
+      const matrix: number[][] = [];
+      for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+      for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+      for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+          matrix[i][j] = b[i-1] === a[j-1] 
+            ? matrix[i-1][j-1] 
+            : Math.min(matrix[i-1][j-1] + 1, matrix[i][j-1] + 1, matrix[i-1][j] + 1);
+        }
+      }
+      return matrix[b.length][a.length];
+    }
+    
+    // Check if two strings are similar (allowing small typos)
+    function isSimilar(a: string, b: string, threshold = 2): boolean {
+      const distance = levenshtein(a.toUpperCase(), b.toUpperCase());
+      // Allow up to 'threshold' character differences, or 15% of length for longer strings
+      const maxAllowed = Math.max(threshold, Math.floor(Math.max(a.length, b.length) * 0.15));
+      return distance <= maxAllowed;
+    }
+    
     // Helper function to find vehicle by device name using fuzzy matching
     function findVehicleByDeviceName(deviceName: string): string | undefined {
       const normalizedDevice = deviceName.replace(/\s+/g, "").toUpperCase();
@@ -130,7 +153,7 @@ serve(async (req) => {
         }
       }
       
-      // 3. Match against make + model (fuzzy)
+      // 3. Match against make + model (fuzzy with typo tolerance)
       for (const [makeModel, id] of vehicleMakeModelMap.entries()) {
         const makeModelNormalized = makeModel.replace(/\s+/g, "");
         const makeModelWords = makeModel.split(/\s+/);
@@ -145,21 +168,27 @@ serve(async (req) => {
           return id;
         }
         
-        // Check if all make/model words appear in device name
+        // Fuzzy match with Levenshtein distance (handles typos like Peugot vs Peugeot)
+        if (isSimilar(normalizedDevice, makeModelNormalized)) {
+          console.log(`Fuzzy matched "${deviceName}" to "${makeModel}" (typo tolerance)`);
+          return id;
+        }
+        
+        // Check if all make/model words appear in device name (with typo tolerance)
         const allWordsMatch = makeModelWords.every(word => 
-          deviceWords.some(dw => dw.includes(word) || word.includes(dw))
+          deviceWords.some(dw => dw.includes(word) || word.includes(dw) || isSimilar(dw, word, 1))
         );
         if (allWordsMatch && makeModelWords.length >= 2) {
           return id;
         }
         
-        // Check if device starts with make and contains part of model
+        // Check if device starts with similar make and contains part of model
         const makeWord = makeModelWords[0];
-        if (deviceWords[0] === makeWord) {
-          // First word matches make, check if any model word matches
+        if (deviceWords.length > 0 && isSimilar(deviceWords[0], makeWord, 1)) {
+          // First word matches make (with typo tolerance), check if any model word matches
           const modelWords = makeModelWords.slice(1);
           const hasModelMatch = modelWords.some(mw => 
-            deviceWords.some(dw => dw.includes(mw) || mw.includes(dw))
+            deviceWords.some(dw => dw.includes(mw) || mw.includes(dw) || isSimilar(dw, mw, 1))
           );
           if (hasModelMatch) {
             return id;
