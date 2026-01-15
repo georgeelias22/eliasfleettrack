@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { DriverList } from '@/components/drivers/DriverList';
 import { MaintenanceScheduleList } from '@/components/maintenance/MaintenanceScheduleList';
+import { MileageImportSettings } from '@/components/fleet/MileageImportSettings';
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -266,6 +267,9 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Mileage Import Settings */}
+            <MileageImportSettings userId={user.id} />
           </TabsContent>
 
           {/* Admin Tab */}
