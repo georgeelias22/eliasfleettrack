@@ -13,7 +13,6 @@ import {
   BarChart3,
   FileText,
   Car,
-  Gauge,
   Route
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
@@ -22,7 +21,7 @@ import { FuelTrendChart } from './FuelTrendChart';
 import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
 import { MileageTrendChart } from './MileageTrendChart';
 import { MileageByVehicleChart } from './MileageByVehicleChart';
-import { FuelEfficiencyChart } from './FuelEfficiencyChart';
+import { MileageVsFuelChart } from './MileageVsFuelChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
 import { TwelveMonthSummary } from './TwelveMonthSummary';
 import { AddFuelInvoiceDialog } from './AddFuelInvoiceDialog';
@@ -169,17 +168,20 @@ export function FleetDashboard() {
           </CardContent>
         </Card>
 
-        {/* Fuel Efficiency Chart */}
+        {/* Mileage vs Fuel Spend Chart */}
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Gauge className="w-4 h-4 text-rose-500" />
-              Fuel Efficiency (MPG)
+              <Fuel className="w-4 h-4 text-amber-500" />
+              Mileage vs Fuel Spend
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {mileageAnalytics ? (
-              <FuelEfficiencyChart data={mileageAnalytics.mpgByVehicle} />
+            {mileageAnalytics && analytics ? (
+              <MileageVsFuelChart 
+                mileageData={mileageAnalytics.mileageByMonth} 
+                fuelData={analytics.fuelByMonth} 
+              />
             ) : (
               <Skeleton className="h-[200px] w-full" />
             )}
