@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +18,7 @@ serve(async (req) => {
     const url = new URL(req.url);
     const apiKey = url.searchParams.get("api_key") || req.headers.get("x-api-key");
     const userId = url.searchParams.get("user_id") || req.headers.get("x-user-id");
+    const dateColumnParam = url.searchParams.get("date_column") || "Date";
 
     // Validate API key
     const expectedApiKey = Deno.env.get("MILEAGE_IMPORT_API_KEY");
@@ -31,24 +33,6 @@ serve(async (req) => {
     if (!userId) {
       return new Response(
         JSON.stringify({ error: "Missing user_id parameter" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Parse request body - expects pre-parsed Excel data from n8n
-    const body = await req.json();
-    const { rows, date_column, registration_columns } = body;
-
-    if (!rows || !Array.isArray(rows)) {
-      return new Response(
-        JSON.stringify({ error: "Missing or invalid rows array. Expected pre-parsed Excel data from n8n." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!date_column) {
-      return new Response(
-        JSON.stringify({ error: "Missing date_column parameter" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -79,21 +63,123 @@ serve(async (req) => {
       vehicleMap.set(normalizedReg, v.id);
     });
 
-    // If registration_columns not provided, try to auto-detect from first row
-    let regColumns = registration_columns;
-    if (!regColumns && rows.length > 0) {
-      const firstRow = rows[0];
-      regColumns = Object.keys(firstRow).filter((key) => {
-        const normalizedKey = key.replace(/\s+/g, "").toUpperCase();
-        return vehicleMap.has(normalizedKey);
-      });
+    let rows: Record<string, unknown>[] = [];
+    let dateColumn = dateColumnParam;
+
+    const contentType = req.headers.get("content-type") || "";
+
+    // Handle different content types
+    if (contentType.includes("multipart/form-data")) {
+      // Handle form-data with file upload
+      const formData = await req.formData();
+      const file = formData.get("file") as File | null;
+      
+      if (!file) {
+        return new Response(
+          JSON.stringify({ error: "No file provided in form-data" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      rows = XLSX.utils.sheet_to_json(sheet);
+      
+      console.log(`Parsed Excel file: ${file.name}, ${rows.length} rows`);
+    } else if (contentType.includes("application/json")) {
+      // Handle pre-parsed JSON
+      const body = await req.json();
+      
+      if (body.rows && Array.isArray(body.rows)) {
+        rows = body.rows;
+        dateColumn = body.date_column || dateColumn;
+      } else if (body.file_base64) {
+        // Handle base64 encoded file
+        const binaryString = atob(body.file_base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const workbook = XLSX.read(bytes, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(sheet);
+        
+        console.log(`Parsed base64 Excel, ${rows.length} rows`);
+      } else {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body. Expected 'rows' array or 'file_base64'" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      // Try to parse as raw binary Excel file
+      try {
+        const arrayBuffer = await req.arrayBuffer();
+        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(sheet);
+        
+        console.log(`Parsed raw binary Excel, ${rows.length} rows`);
+      } catch (parseError) {
+        console.error("Failed to parse as Excel:", parseError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Could not parse request. Send Excel file as form-data, base64 JSON, or raw binary.",
+            hint: "For n8n, use form-data with 'file' field set to the binary attachment"
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    if (!regColumns || regColumns.length === 0) {
+    if (rows.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No data rows found in file" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Auto-detect date column if not found
+    const firstRow = rows[0] as Record<string, unknown>;
+    const columnNames = Object.keys(firstRow);
+    
+    if (!columnNames.includes(dateColumn)) {
+      // Try to find a date-like column
+      const possibleDateColumns = columnNames.filter(col => 
+        col.toLowerCase().includes("date") || 
+        col.toLowerCase().includes("day") ||
+        col.toLowerCase() === "a" // Often first column in trackers
+      );
+      
+      if (possibleDateColumns.length > 0) {
+        dateColumn = possibleDateColumns[0];
+        console.log(`Auto-detected date column: ${dateColumn}`);
+      } else {
+        dateColumn = columnNames[0]; // Use first column as fallback
+        console.log(`Using first column as date: ${dateColumn}`);
+      }
+    }
+
+    // Find registration columns (columns that match vehicle registrations)
+    const regColumns = columnNames.filter((col) => {
+      if (col === dateColumn) return false;
+      const normalizedCol = col.replace(/\s+/g, "").toUpperCase();
+      return vehicleMap.has(normalizedCol);
+    });
+
+    console.log(`Found ${regColumns.length} vehicle columns: ${regColumns.join(", ")}`);
+
+    if (regColumns.length === 0) {
       return new Response(
         JSON.stringify({ 
-          error: "No vehicle registration columns found. Provide registration_columns or ensure column headers match vehicle registrations.",
-          available_vehicles: vehicles?.map(v => v.registration) || []
+          error: "No vehicle registration columns found in file",
+          available_columns: columnNames,
+          your_vehicles: vehicles?.map(v => v.registration) || [],
+          hint: "Column headers should match your vehicle registrations"
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -108,8 +194,9 @@ serve(async (req) => {
 
     for (const row of rows) {
       try {
-        // Get date from the row
-        const dateValue = row[date_column];
+        const rowData = row as Record<string, unknown>;
+        const dateValue = rowData[dateColumn];
+        
         if (!dateValue) {
           results.skipped++;
           continue;
@@ -138,7 +225,7 @@ serve(async (req) => {
 
         // Process each registration column
         for (const regColumn of regColumns) {
-          const mileageValue = row[regColumn];
+          const mileageValue = rowData[regColumn];
           if (mileageValue === undefined || mileageValue === null || mileageValue === "") {
             continue;
           }
@@ -156,7 +243,6 @@ serve(async (req) => {
           const vehicleId = vehicleMap.get(normalizedReg);
 
           if (!vehicleId) {
-            results.errors.push(`Vehicle not found: ${regColumn}`);
             continue;
           }
 
@@ -196,6 +282,7 @@ serve(async (req) => {
         message: `Imported ${results.imported} records, skipped ${results.skipped}`,
         details: results,
         processed_columns: regColumns,
+        date_column_used: dateColumn,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
