@@ -1,6 +1,7 @@
 import { useFleetAnalytics } from '@/hooks/useFleetAnalytics';
 import { useAllFuelRecords } from '@/hooks/useFuelRecords';
 import { useVehicles } from '@/hooks/useVehicles';
+import { useMileageAnalytics } from '@/hooks/useMileageRecords';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -11,12 +12,17 @@ import {
   Receipt,
   BarChart3,
   FileText,
-  Car
+  Car,
+  Gauge,
+  Route
 } from 'lucide-react';
 import { CostTrendChart } from './CostTrendChart';
 import { CostByVehicleChart } from './CostByVehicleChart';
 import { FuelTrendChart } from './FuelTrendChart';
 import { FuelCostByVehicleChart } from './FuelCostByVehicleChart';
+import { MileageTrendChart } from './MileageTrendChart';
+import { MileageByVehicleChart } from './MileageByVehicleChart';
+import { FuelEfficiencyChart } from './FuelEfficiencyChart';
 import { AllFuelRecordsList } from './AllFuelRecordsList';
 import { TwelveMonthSummary } from './TwelveMonthSummary';
 import { AddFuelInvoiceDialog } from './AddFuelInvoiceDialog';
@@ -27,6 +33,7 @@ export function FleetDashboard() {
   const { data: analytics, isLoading, error } = useFleetAnalytics();
   const { data: fuelRecords = [] } = useAllFuelRecords();
   const { data: vehicles = [] } = useVehicles();
+  const { data: mileageAnalytics } = useMileageAnalytics();
 
   if (isLoading) {
     return <FleetDashboardSkeleton />;
@@ -122,6 +129,60 @@ export function FleetDashboard() {
           </CardHeader>
           <CardContent>
             <FuelCostByVehicleChart fuelRecords={fuelRecords} vehicles={vehicles} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Mileage Charts Row - Hidden on Mobile */}
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Mileage Trend Chart */}
+        <Card className="border-border/50 bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Route className="w-4 h-4 text-emerald-500" />
+              Mileage Trend
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mileageAnalytics ? (
+              <MileageTrendChart data={mileageAnalytics.mileageByMonth} />
+            ) : (
+              <Skeleton className="h-[200px] w-full" />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Mileage by Vehicle Chart */}
+        <Card className="border-border/50 bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Car className="w-4 h-4 text-violet-500" />
+              Mileage by Vehicle
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mileageAnalytics ? (
+              <MileageByVehicleChart data={mileageAnalytics.mileageByVehicle} />
+            ) : (
+              <Skeleton className="h-[200px] w-full" />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Fuel Efficiency Chart */}
+        <Card className="border-border/50 bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Gauge className="w-4 h-4 text-rose-500" />
+              Fuel Efficiency (MPG)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mileageAnalytics ? (
+              <FuelEfficiencyChart data={mileageAnalytics.mpgByVehicle} />
+            ) : (
+              <Skeleton className="h-[200px] w-full" />
+            )}
           </CardContent>
         </Card>
       </div>
