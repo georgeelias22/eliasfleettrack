@@ -7,6 +7,46 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper function to parse dates from various formats
+function parseDate(dateValue: unknown): string | null {
+  if (!dateValue) return null;
+  
+  if (typeof dateValue === "number") {
+    // Excel serial date
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000);
+    return date.toISOString().split("T")[0];
+  } else if (typeof dateValue === "string") {
+    // Try to parse string date
+    const parsed = new Date(dateValue);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().split("T")[0];
+    }
+    // Try DD/MM/YYYY format
+    const ddmmyyyy = dateValue.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (ddmmyyyy) {
+      const date = new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split("T")[0];
+      }
+    }
+    return null;
+  }
+  return null;
+}
+
+// Helper function to parse mileage values
+function parseMileage(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  
+  const mileage = typeof value === "number" 
+    ? value 
+    : parseFloat(String(value).replace(/[^0-9.-]/g, ""));
+  
+  if (isNaN(mileage) || mileage < 0) return null;
+  return mileage;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -143,47 +183,12 @@ serve(async (req) => {
       );
     }
 
-    // Auto-detect date column if not found
     const firstRow = rows[0] as Record<string, unknown>;
     const columnNames = Object.keys(firstRow);
     
-    if (!columnNames.includes(dateColumn)) {
-      // Try to find a date-like column
-      const possibleDateColumns = columnNames.filter(col => 
-        col.toLowerCase().includes("date") || 
-        col.toLowerCase().includes("day") ||
-        col.toLowerCase() === "a" // Often first column in trackers
-      );
-      
-      if (possibleDateColumns.length > 0) {
-        dateColumn = possibleDateColumns[0];
-        console.log(`Auto-detected date column: ${dateColumn}`);
-      } else {
-        dateColumn = columnNames[0]; // Use first column as fallback
-        console.log(`Using first column as date: ${dateColumn}`);
-      }
-    }
-
-    // Find registration columns (columns that match vehicle registrations)
-    const regColumns = columnNames.filter((col) => {
-      if (col === dateColumn) return false;
-      const normalizedCol = col.replace(/\s+/g, "").toUpperCase();
-      return vehicleMap.has(normalizedCol);
-    });
-
-    console.log(`Found ${regColumns.length} vehicle columns: ${regColumns.join(", ")}`);
-
-    if (regColumns.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: "No vehicle registration columns found in file",
-          available_columns: columnNames,
-          your_vehicles: vehicles?.map(v => v.registration) || [],
-          hint: "Column headers should match your vehicle registrations"
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log("Excel columns found:", columnNames);
+    console.log("First row sample:", JSON.stringify(firstRow).substring(0, 500));
+    console.log("Your vehicles:", vehicles?.map(v => v.registration).join(", "));
 
     // Process records
     const results = {
@@ -192,61 +197,146 @@ serve(async (req) => {
       errors: [] as string[],
     };
 
-    for (const row of rows) {
-      try {
-        const rowData = row as Record<string, unknown>;
-        const dateValue = rowData[dateColumn];
-        
-        if (!dateValue) {
-          results.skipped++;
-          continue;
-        }
+    // Detect format: Row-based (each row = one vehicle's daily data) or Column-based (each column = a vehicle)
+    // Row-based format has columns like: Vehicle/Registration, Date, Mileage/Distance
+    // Column-based format has vehicle registrations as column headers
+    
+    const lowerColumns = columnNames.map(c => c.toLowerCase());
+    const hasVehicleColumn = lowerColumns.some(c => 
+      c.includes("vehicle") || c.includes("registration") || c.includes("reg") || c.includes("vrn")
+    );
+    const hasMileageColumn = lowerColumns.some(c => 
+      c.includes("mileage") || c.includes("distance") || c.includes("miles") || c.includes("km")
+    );
+    const hasDateColumn = lowerColumns.some(c => 
+      c.includes("date") || c.includes("day")
+    );
 
-        // Parse the date (handle various formats)
-        let recordDate: string;
-        if (typeof dateValue === "number") {
-          // Excel serial date
-          const excelEpoch = new Date(1899, 11, 30);
-          const date = new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000);
-          recordDate = date.toISOString().split("T")[0];
-        } else if (typeof dateValue === "string") {
-          // Try to parse string date
-          const parsed = new Date(dateValue);
-          if (isNaN(parsed.getTime())) {
+    // Check for column-based format (vehicle registrations as headers)
+    const regColumns = columnNames.filter((col) => {
+      const normalizedCol = col.replace(/\s+/g, "").toUpperCase();
+      return vehicleMap.has(normalizedCol);
+    });
+
+    console.log(`Format detection - hasVehicleColumn: ${hasVehicleColumn}, hasMileageColumn: ${hasMileageColumn}, hasDateColumn: ${hasDateColumn}, regColumns: ${regColumns.length}`);
+
+    if (regColumns.length > 0) {
+      // Column-based format: registrations are column headers
+      console.log(`Using column-based format with ${regColumns.length} vehicle columns: ${regColumns.join(", ")}`);
+      
+      // Auto-detect date column
+      let detectedDateColumn = dateColumn;
+      if (!columnNames.includes(detectedDateColumn)) {
+        const possibleDateColumns = columnNames.filter(col => 
+          col.toLowerCase().includes("date") || 
+          col.toLowerCase().includes("day") ||
+          !vehicleMap.has(col.replace(/\s+/g, "").toUpperCase())
+        );
+        detectedDateColumn = possibleDateColumns[0] || columnNames[0];
+      }
+      console.log(`Date column: ${detectedDateColumn}`);
+
+      for (const row of rows) {
+        try {
+          const rowData = row as Record<string, unknown>;
+          const dateValue = rowData[detectedDateColumn];
+          
+          if (!dateValue) {
             results.skipped++;
-            results.errors.push(`Invalid date: ${dateValue}`);
             continue;
           }
-          recordDate = parsed.toISOString().split("T")[0];
-        } else {
+
+          const recordDate = parseDate(dateValue);
+          if (!recordDate) {
+            results.skipped++;
+            continue;
+          }
+
+          for (const regColumn of regColumns) {
+            const mileageValue = rowData[regColumn];
+            if (mileageValue === undefined || mileageValue === null || mileageValue === "") {
+              continue;
+            }
+
+            const dailyMileage = parseMileage(mileageValue);
+            if (dailyMileage === null) continue;
+
+            const normalizedReg = regColumn.replace(/\s+/g, "").toUpperCase();
+            const vehicleId = vehicleMap.get(normalizedReg);
+            if (!vehicleId) continue;
+
+            const { error: upsertError } = await supabase
+              .from("mileage_records")
+              .upsert(
+                {
+                  vehicle_id: vehicleId,
+                  record_date: recordDate,
+                  daily_mileage: Math.round(dailyMileage),
+                  source: "n8n-excel",
+                },
+                { onConflict: "vehicle_id,record_date" }
+              );
+
+            if (upsertError) {
+              results.errors.push(`Failed: ${regColumn} on ${recordDate}`);
+              results.skipped++;
+            } else {
+              results.imported++;
+            }
+          }
+        } catch (rowError) {
           results.skipped++;
-          continue;
         }
+      }
+    } else if (hasVehicleColumn && hasMileageColumn) {
+      // Row-based format: each row has vehicle registration and mileage
+      console.log("Using row-based format (vehicle + mileage columns)");
+      
+      // Find the relevant columns
+      const vehicleCol = columnNames.find(c => {
+        const lower = c.toLowerCase();
+        return lower.includes("vehicle") || lower.includes("registration") || lower.includes("reg") || lower.includes("vrn");
+      })!;
+      
+      const mileageCol = columnNames.find(c => {
+        const lower = c.toLowerCase();
+        return lower.includes("mileage") || lower.includes("distance") || lower.includes("miles") || lower.includes("km");
+      })!;
+      
+      const dateCol = columnNames.find(c => {
+        const lower = c.toLowerCase();
+        return lower.includes("date") || lower.includes("day");
+      });
 
-        // Process each registration column
-        for (const regColumn of regColumns) {
-          const mileageValue = rowData[regColumn];
-          if (mileageValue === undefined || mileageValue === null || mileageValue === "") {
-            continue;
-          }
+      console.log(`Columns detected - Vehicle: ${vehicleCol}, Mileage: ${mileageCol}, Date: ${dateCol || "not found"}`);
 
-          const dailyMileage = typeof mileageValue === "number" 
-            ? mileageValue 
-            : parseFloat(String(mileageValue).replace(/[^0-9.-]/g, ""));
-
-          if (isNaN(dailyMileage) || dailyMileage < 0) {
-            continue;
-          }
-
-          // Find vehicle ID
-          const normalizedReg = regColumn.replace(/\s+/g, "").toUpperCase();
-          const vehicleId = vehicleMap.get(normalizedReg);
-
+      for (const row of rows) {
+        try {
+          const rowData = row as Record<string, unknown>;
+          const vehicleReg = String(rowData[vehicleCol] || "").replace(/\s+/g, "").toUpperCase();
+          const vehicleId = vehicleMap.get(vehicleReg);
+          
           if (!vehicleId) {
+            results.skipped++;
             continue;
           }
 
-          // Upsert the mileage record
+          const mileageValue = rowData[mileageCol];
+          const dailyMileage = parseMileage(mileageValue);
+          if (dailyMileage === null) {
+            results.skipped++;
+            continue;
+          }
+
+          // Use date column if available, otherwise use today
+          let recordDate: string;
+          if (dateCol && rowData[dateCol]) {
+            const parsed = parseDate(rowData[dateCol]);
+            recordDate = parsed || new Date().toISOString().split("T")[0];
+          } else {
+            recordDate = new Date().toISOString().split("T")[0];
+          }
+
           const { error: upsertError } = await supabase
             .from("mileage_records")
             .upsert(
@@ -256,22 +346,33 @@ serve(async (req) => {
                 daily_mileage: Math.round(dailyMileage),
                 source: "n8n-excel",
               },
-              {
-                onConflict: "vehicle_id,record_date",
-              }
+              { onConflict: "vehicle_id,record_date" }
             );
 
           if (upsertError) {
+            results.errors.push(`Failed: ${vehicleReg} - ${upsertError.message}`);
             results.skipped++;
-            results.errors.push(`Failed to import ${regColumn} on ${recordDate}: ${upsertError.message}`);
           } else {
             results.imported++;
           }
+        } catch (rowError) {
+          results.skipped++;
         }
-      } catch (rowError) {
-        results.skipped++;
-        results.errors.push(`Error processing row: ${rowError instanceof Error ? rowError.message : String(rowError)}`);
       }
+    } else {
+      // Unknown format - return helpful error
+      return new Response(
+        JSON.stringify({ 
+          error: "Could not detect Excel format",
+          available_columns: columnNames,
+          first_row_sample: Object.fromEntries(
+            Object.entries(firstRow).slice(0, 5).map(([k, v]) => [k, String(v).substring(0, 50)])
+          ),
+          your_vehicles: vehicles?.map(v => v.registration) || [],
+          hint: "Excel should have either: (A) vehicle registrations as column headers with dates in rows, OR (B) columns for Vehicle/Registration, Mileage/Distance, and optionally Date"
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     console.log("Excel import results:", results);
