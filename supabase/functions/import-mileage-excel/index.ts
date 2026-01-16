@@ -396,26 +396,41 @@ serve(async (req) => {
           console.log(`Matched device "${deviceName}" to vehicle ID ${vehicleId}`);
 
           const mileageValue = rowData[mileageCol];
-          // Handle "Route Length" format like "123.45 km" or just a number
-          let dailyMileage: number | null = null;
+          // The "Mileage" column contains the cumulative odometer reading, not daily mileage
+          let odometerReading: number | null = null;
           
           if (typeof mileageValue === "number") {
-            dailyMileage = mileageValue;
+            odometerReading = mileageValue;
           } else if (typeof mileageValue === "string") {
-            // Extract number from strings like "123.45 km" or "45.6 miles"
-            const numMatch = mileageValue.match(/[\d.]+/);
+            // Extract number from strings like "123456" or "123,456"
+            const cleaned = mileageValue.replace(/[,\s]/g, "");
+            const numMatch = cleaned.match(/[\d.]+/);
             if (numMatch) {
-              dailyMileage = parseFloat(numMatch[0]);
-              // Convert km to miles if needed (assuming the value is in km based on "Route Length")
-              if (mileageValue.toLowerCase().includes("km")) {
-                dailyMileage = dailyMileage * 0.621371;
-              }
+              odometerReading = parseFloat(numMatch[0]);
             }
           }
 
-          if (dailyMileage === null || isNaN(dailyMileage)) {
+          if (odometerReading === null || isNaN(odometerReading) || odometerReading <= 0) {
             results.skipped++;
             continue;
+          }
+
+          // Look up the previous day's odometer reading to calculate daily mileage
+          const { data: previousRecord } = await supabase
+            .from("mileage_records")
+            .select("odometer_reading, record_date")
+            .eq("vehicle_id", vehicleId)
+            .lt("record_date", reportDate)
+            .order("record_date", { ascending: false })
+            .limit(1)
+            .single();
+
+          let dailyMileage = 0;
+          if (previousRecord?.odometer_reading) {
+            dailyMileage = Math.max(0, odometerReading - previousRecord.odometer_reading);
+            console.log(`Calculated daily mileage: ${odometerReading} - ${previousRecord.odometer_reading} = ${dailyMileage}`);
+          } else {
+            console.log(`No previous odometer reading found for ${deviceName}, daily mileage set to 0`);
           }
 
           const { error: upsertError } = await supabase
@@ -425,6 +440,7 @@ serve(async (req) => {
                 vehicle_id: vehicleId,
                 record_date: reportDate,
                 daily_mileage: Math.round(dailyMileage),
+                odometer_reading: Math.round(odometerReading),
                 source: "n8n-excel",
               },
               { onConflict: "vehicle_id,record_date" }
