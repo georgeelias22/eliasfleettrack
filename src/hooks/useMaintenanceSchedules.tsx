@@ -1,16 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MaintenanceSchedule } from '@/types/maintenance';
-import { useAuth } from './useAuth';
 
 export function useMaintenanceSchedules(vehicleId?: string) {
-  const { user } = useAuth();
-  
   return useQuery({
-    queryKey: ['maintenance-schedules', vehicleId, user?.id],
+    queryKey: ['maintenance-schedules', vehicleId],
     queryFn: async () => {
-      if (!user) return [];
-      
       let query = supabase
         .from('maintenance_schedules')
         .select('*')
@@ -25,18 +20,13 @@ export function useMaintenanceSchedules(vehicleId?: string) {
       if (error) throw error;
       return data as MaintenanceSchedule[];
     },
-    enabled: !!user,
   });
 }
 
 export function useAllMaintenanceSchedules() {
-  const { user } = useAuth();
-  
   return useQuery({
-    queryKey: ['all-maintenance-schedules', user?.id],
+    queryKey: ['all-maintenance-schedules'],
     queryFn: async () => {
-      if (!user) return [];
-      
       const { data, error } = await supabase
         .from('maintenance_schedules')
         .select('*, vehicles(registration, make, model)')
@@ -46,21 +36,17 @@ export function useAllMaintenanceSchedules() {
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
   });
 }
 
 export function useCreateMaintenanceSchedule() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   
   return useMutation({
     mutationFn: async (schedule: Omit<MaintenanceSchedule, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-      if (!user) throw new Error('Not authenticated');
-      
       const { data, error } = await supabase
         .from('maintenance_schedules')
-        .insert({ ...schedule, user_id: user.id })
+        .insert({ ...schedule, user_id: '00000000-0000-0000-0000-000000000000' })
         .select()
         .single();
       
@@ -128,7 +114,6 @@ export function useMarkMaintenanceComplete() {
       completedDate: string; 
       completedMileage?: number;
     }) => {
-      // First get the schedule to calculate next due
       const { data: schedule, error: fetchError } = await supabase
         .from('maintenance_schedules')
         .select('*')
@@ -137,7 +122,6 @@ export function useMarkMaintenanceComplete() {
       
       if (fetchError) throw fetchError;
       
-      // Calculate next due date
       let nextDueDate: string | null = null;
       if (schedule.interval_months) {
         const date = new Date(completedDate);
@@ -145,7 +129,6 @@ export function useMarkMaintenanceComplete() {
         nextDueDate = date.toISOString().split('T')[0];
       }
       
-      // Calculate next due mileage
       let nextDueMileage: number | null = null;
       if (schedule.interval_miles && completedMileage) {
         nextDueMileage = completedMileage + schedule.interval_miles;

@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Document, DocumentExtractedData } from '@/types/fleet';
-import { useAuth } from './useAuth';
 
 export function useDocuments(vehicleId?: string) {
   return useQuery({
@@ -27,7 +26,6 @@ export function useDocuments(vehicleId?: string) {
 
 export function useUploadDocument() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   
   return useMutation({
     mutationFn: async ({ 
@@ -37,17 +35,13 @@ export function useUploadDocument() {
       vehicleId: string; 
       file: File;
     }) => {
-      if (!user) throw new Error('Not authenticated');
-      
-      // Upload file to storage
-      const filePath = `${user.id}/${vehicleId}/${Date.now()}-${file.name}`;
+      const filePath = `uploads/${vehicleId}/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('fleet-documents')
         .upload(filePath, file);
       
       if (uploadError) throw uploadError;
       
-      // Create document record
       const { data: doc, error: docError } = await supabase
         .from('documents')
         .insert({
@@ -80,13 +74,11 @@ export function useScanDocument() {
       fileContent: string;
       fileName: string;
     }) => {
-      // Update status to processing
       await supabase
         .from('documents')
         .update({ processing_status: 'processing' })
         .eq('id', documentId);
       
-      // Call the edge function
       const { data, error } = await supabase.functions.invoke('scan-document', {
         body: { fileContent, fileName },
       });
@@ -99,7 +91,6 @@ export function useScanDocument() {
         throw error;
       }
       
-      // Check for user-friendly error messages
       if (data?.error) {
         await supabase
           .from('documents')
@@ -110,7 +101,6 @@ export function useScanDocument() {
       
       const extractedData = data.data as DocumentExtractedData;
       
-      // Update document with extracted data
       const { error: updateError } = await supabase
         .from('documents')
         .update({
@@ -132,18 +122,13 @@ export function useScanDocument() {
 
 export function useDeleteDocument() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   
   return useMutation({
     mutationFn: async ({ id, filePath, vehicleId }: { id: string; filePath: string; vehicleId: string }) => {
-      if (!user) throw new Error('Not authenticated');
-      
-      // Delete from storage
       await supabase.storage
         .from('fleet-documents')
         .remove([filePath]);
       
-      // Delete record
       const { error } = await supabase
         .from('documents')
         .delete()

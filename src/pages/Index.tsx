@@ -1,7 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
 import { useVehicles } from '@/hooks/useVehicles';
-import { AuthForm } from '@/components/auth/AuthForm';
 import { VehicleCard } from '@/components/fleet/VehicleCard';
 import { AddVehicleDialog } from '@/components/fleet/AddVehicleDialog';
 import { AddFuelInvoiceDialog } from '@/components/fleet/AddFuelInvoiceDialog';
@@ -10,24 +8,11 @@ import { FleetDashboard } from '@/components/fleet/FleetDashboard';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Truck, LogOut, Loader2, LayoutDashboard, Car, Settings, BarChart3 } from 'lucide-react';
+import { Truck, Loader2, LayoutDashboard, Car, Settings, BarChart3 } from 'lucide-react';
 
 const Index = () => {
-  const { user, loading: authLoading, signOut } = useAuth();
   const { data: vehicles = [], isLoading: vehiclesLoading } = useVehicles();
   const navigate = useNavigate();
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthForm />;
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -52,9 +37,6 @@ const Index = () => {
             </Button>
             <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
               <Settings className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={signOut}>
-              <LogOut className="w-5 h-5" />
             </Button>
           </div>
         </div>

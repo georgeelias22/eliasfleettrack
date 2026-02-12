@@ -3,7 +3,6 @@ import { useVehicle, useUpdateVehicle, useDeleteVehicle } from '@/hooks/useVehic
 import { useServiceRecords } from '@/hooks/useServiceRecords';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useFuelRecords } from '@/hooks/useFuelRecords';
-import { useAuth } from '@/hooks/useAuth';
 import { MOTStatusBadge } from '@/components/fleet/MOTStatusBadge';
 import { DocumentUpload } from '@/components/fleet/DocumentUpload';
 import { DocumentList } from '@/components/fleet/DocumentList';
@@ -47,7 +46,6 @@ import { Badge } from '@/components/ui/badge';
 export default function VehicleDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { toast } = useToast();
 
   const { data: vehicle, isLoading } = useVehicle(id || '');
@@ -68,11 +66,6 @@ export default function VehicleDetail() {
       setFuelType((vehicle as any).fuel_type);
     }
   }, [vehicle]);
-
-  if (!user) {
-    navigate('/');
-    return null;
-  }
 
   if (isLoading) {
     return (
@@ -118,7 +111,6 @@ export default function VehicleDetail() {
     }
   };
 
-  // Calculate fuel totals
   const totalFuelCost = fuelRecords.reduce((sum, r) => sum + r.total_cost, 0);
 
   return (
@@ -211,7 +203,6 @@ export default function VehicleDetail() {
               </CardContent>
             </Card>
 
-            {/* Fuel Type */}
             <Card className="border-border/50 gradient-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -257,7 +248,6 @@ export default function VehicleDetail() {
 
             <VehicleTaxSettings vehicle={vehicle} />
 
-            {/* Vehicle Status */}
             <Card className="border-border/50 gradient-card">
               <CardHeader><CardTitle className="flex items-center gap-2"><Power className="w-5 h-5" /> Vehicle Status</CardTitle></CardHeader>
               <CardContent>

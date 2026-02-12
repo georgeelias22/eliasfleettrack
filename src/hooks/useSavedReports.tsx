@@ -1,18 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
 import { SavedReport, ReportConfig } from '@/types/reports';
 import { toast } from 'sonner';
 
 export function useSavedReports() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: reports, isLoading, error } = useQuery({
-    queryKey: ['saved-reports', user?.id],
+    queryKey: ['saved-reports'],
     queryFn: async () => {
-      if (!user) return [];
-      
       const { data, error } = await supabase
         .from('saved_reports')
         .select('*')
@@ -21,7 +17,6 @@ export function useSavedReports() {
       if (error) throw error;
       return data as SavedReport[];
     },
-    enabled: !!user,
   });
 
   const createReport = useMutation({
@@ -31,12 +26,10 @@ export function useSavedReports() {
       report_type: SavedReport['report_type'];
       config: ReportConfig;
     }) => {
-      if (!user) throw new Error('Not authenticated');
-
       const { data, error } = await supabase
         .from('saved_reports')
         .insert({
-          user_id: user.id,
+          user_id: '00000000-0000-0000-0000-000000000000',
           name: report.name,
           description: report.description || null,
           report_type: report.report_type,
