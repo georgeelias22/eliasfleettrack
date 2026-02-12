@@ -3,7 +3,6 @@ import { useDropzone } from 'react-dropzone';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useCreateFuelRecord, useAllFuelRecords, checkFuelRecordDuplicate } from '@/hooks/useFuelRecords';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
 import { checkMultipleFilesForDuplicates, formatDuplicateMessage } from '@/hooks/useDuplicateCheck';
 import { UploadedFuelInvoicesDialog } from '@/components/fleet/UploadedFuelInvoicesDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -79,7 +78,6 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   const { data: existingFuelRecords = [] } = useAllFuelRecords();
   const createFuelRecord = useCreateFuelRecord();
   const { toast } = useToast();
-  const { user } = useAuth();
 
   // Compute which line items are duplicates (both against DB and within the batch)
   const duplicateInfo = useMemo(() => {
@@ -156,36 +154,8 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (!user) {
-      setFiles(prev => [...prev, ...acceptedFiles]);
-      return;
-    }
-
-    setCheckingDuplicates(true);
-    try {
-      const duplicateResults = await checkMultipleFilesForDuplicates(acceptedFiles, user.id);
-      const duplicates = duplicateResults.filter(r => r.result.isDuplicate);
-      const nonDuplicates = duplicateResults.filter(r => !r.result.isDuplicate);
-
-      if (duplicates.length > 0) {
-        const message = formatDuplicateMessage(duplicates);
-        toast({
-          title: 'Duplicate files detected',
-          description: message,
-          variant: 'destructive',
-        });
-      }
-
-      if (nonDuplicates.length > 0) {
-        setFiles(prev => [...prev, ...nonDuplicates.map(r => r.file)]);
-      }
-    } catch (error) {
-      // If duplicate check fails, still allow the upload
-      setFiles(prev => [...prev, ...acceptedFiles]);
-    } finally {
-      setCheckingDuplicates(false);
-    }
-  }, [user, toast]);
+    setFiles(prev => [...prev, ...acceptedFiles]);
+  }, [toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -279,17 +249,6 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
     try {
       const vehicleRegistrations = vehicles.map(v => v.registration);
 
-      // Ensure we have a signed-in user token for the backend function (otherwise it sends the anon key)
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (!accessToken) {
-        toast({
-          title: 'Sign in required',
-          description: 'Please sign in before scanning invoices.',
-          variant: 'destructive',
-        });
-        return;
-      }
 
       const allLineItems: FuelLineItem[] = [];
       let lastDate = '';
@@ -312,9 +271,6 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
                   ...scanInput,
                   fileName: f.name,
                   vehicleRegistrations,
-                },
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
                 },
               });
               
@@ -457,11 +413,8 @@ export function AddFuelInvoiceDialog({ trigger }: AddFuelInvoiceDialogProps = {}
 
   const uploadInvoiceFile = async (file: File): Promise<string | null> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+      const fileName = `uploads/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
       
       const { error } = await supabase.storage
         .from('fuel-invoices')

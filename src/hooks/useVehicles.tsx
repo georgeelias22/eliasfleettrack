@@ -1,16 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Vehicle } from '@/types/fleet';
-import { useAuth } from './useAuth';
 
 export function useVehicles() {
-  const { user } = useAuth();
-  
   return useQuery({
-    queryKey: ['vehicles', user?.id],
+    queryKey: ['vehicles'],
     queryFn: async () => {
-      if (!user) return [];
-      
       const { data, error } = await supabase
         .from('vehicles')
         .select('*')
@@ -19,17 +14,14 @@ export function useVehicles() {
       if (error) throw error;
       return data as Vehicle[];
     },
-    enabled: !!user,
   });
 }
 
 export function useVehicle(id: string) {
-  const { user } = useAuth();
-  
   return useQuery({
     queryKey: ['vehicle', id],
     queryFn: async () => {
-      if (!user || !id) return null;
+      if (!id) return null;
       
       const { data, error } = await supabase
         .from('vehicles')
@@ -40,21 +32,18 @@ export function useVehicle(id: string) {
       if (error) throw error;
       return data as Vehicle;
     },
-    enabled: !!user && !!id,
+    enabled: !!id,
   });
 }
 
 export function useCreateVehicle() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   
   return useMutation({
     mutationFn: async (vehicle: Omit<Vehicle, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-      if (!user) throw new Error('Not authenticated');
-      
       const { data, error } = await supabase
         .from('vehicles')
-        .insert({ ...vehicle, user_id: user.id })
+        .insert({ ...vehicle, user_id: '00000000-0000-0000-0000-000000000000' })
         .select()
         .single();
       
